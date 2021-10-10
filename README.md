@@ -24,3 +24,8 @@ python -m moral_rewards.scripts.convert_moral_data \
 --val_size 0.1 \
 --random_seed 0
 ```
+
+Train neural network to approximate reward function based on preferences from Moral Machine Dataset
+```
+python -m moral_rewards.train_moral_reward_model
+```
