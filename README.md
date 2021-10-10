@@ -1,10 +1,12 @@
 # moral-driving-agent
 Moral Driving Agent
 
+Note: All scripts should be executed from `src/` directory
+
 ## Moral Rewards
 Extract data from Moral Machine Dataset
 ```
-python -m extract_moral_data \
+python -m moral_rewards.scripts.extract_moral_data \
 --input_data_path 'data/SharedResponses.csv' \
 --output_data_path 'data/moral_data.csv' \
 --countries 'SGP' \
@@ -13,7 +15,7 @@ python -m extract_moral_data \
 
 Convert data from extracted Moral Machine Dataset
 ```
-python -m convert_moral_data \
+python -m moral_rewards.scripts.convert_moral_data \
 --input_data_path 'data/moral_data.csv' \
 --data_path_train 'data/moral_data_train.npz' \
 --data_path_val 'data/moral_data_val.npz' \
