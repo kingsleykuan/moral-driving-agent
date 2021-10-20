@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from moral_rewards.base.base_model import BaseModel
+from base.base_model import BaseModel
 
 
 class MoralRewardModel(BaseModel):

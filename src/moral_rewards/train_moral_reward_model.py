@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader
 
 from moral_rewards.model import MoralRewardModel
 from moral_rewards.moral_data import MoralMachineDataset
-from moral_rewards.base.trainer import Trainer
-from moral_rewards.base.utils import recursive_to_device
+from base.trainer import Trainer
+from base.utils import recursive_to_device
 
 
 CONFIG = {
