@@ -9,7 +9,9 @@ from base.base_model import BaseModel
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-Transition = collections.namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
+# Transition = collections.namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
+transition = []
+Transition = transition.fromkeys(["state", "action", "reward", "next_state", "done"])
 
 class ReplayMemory():
     def __init__(self, memory_size):
@@ -50,28 +52,27 @@ class ReplayMemory():
               All `torch.tensor` (except `actions`) should have a datatype `torch.float` and resides in torch device
               `device`.
         '''
-        transitionList = random.sample(self.buffer, batch_size)
-        stateTensorList = []
-        actionTensorList = []
-        rewardTensorList = []
-        nextStateTensorList = []
-        doneTensorList = []
-        for transition in transitionList:
-            state, action, reward, nextState, done = transition
-            stateTensorList.append(state)
-            actionTensorList.append(action)
-            rewardTensorList.append(reward)
-            nextStateTensorList.append(nextState)
-            doneTensorList.append(done)
+        transition_dict_list = random.sample(self.buffer, batch_size)
+        state_tensor_list = []
+        action_tensor_list = []
+        reward_tensor_list = []
+        next_state_tensor_list = []
+        done_tensor_list = []
+        for transition in transition_dict_list:
+            state_tensor_list.append(transition["state"])
+            action_tensor_list.append(transition["action"])
+            reward_tensor_list.append(transition["reward"])
+            next_state_tensor_list.append(transition["next_state"])
+            done_tensor_list.append(transition["done"])
 
         '''
         May not need for proj. Use for testing in assignment env.
         '''
-        stateTensor = torch.tensor(stateTensorList).float().to(device)
-        actionTensor = torch.tensor(actionTensorList).to(device)
-        rewardTensor = torch.tensor(rewardTensorList).float().to(device)
-        nextStateTensor = torch.tensor(nextStateTensorList).float().to(device)
-        doneTensor = torch.tensor(doneTensorList).float().to(device)
+        stateTensor = torch.tensor(state_tensor_list).float().to(device)
+        actionTensor = torch.tensor(action_tensor_list).to(device)
+        rewardTensor = torch.tensor(reward_tensor_list).float().to(device)
+        nextStateTensor = torch.tensor(next_state_tensor_list).float().to(device)
+        doneTensor = torch.tensor(done_tensor_list).float().to(device)
 
         return stateTensor, actionTensor, rewardTensor, nextStateTensor, doneTensor
         pass
