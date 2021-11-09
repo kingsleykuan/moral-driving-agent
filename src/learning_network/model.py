@@ -7,51 +7,18 @@ import random
 
 from base.base_model import BaseModel
 
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# Transition = collections.namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
-transition = []
-Transition = transition.fromkeys(["state", "action", "reward", "next_state", "done"])
 
 class ReplayMemory():
     def __init__(self, memory_size):
-        '''
-        FILL ME : This function should initialize the replay buffer `self.buffer` with maximum size of `buffer_limit` (`int`).
-                  len(self.buffer) should give the current size of the buffer `self.buffer`.
-        '''
         self.buffer = collections.deque([], maxlen=memory_size)
         pass
 
     def push(self, transition):
-        '''
-        FILL ME : This function should store the transition of type `Transition` to the buffer `self.buffer`.
-
-        Input:
-            * `transition` (`Transition`): tuple of a single transition (state, action, reward, next_state, done).
-                                           This function might also need to handle the case  when buffer is full.
-        Output:
-            * None
-        '''
         self.buffer.append(transition)
         pass
 
     def sample(self, batch_size):
-        '''
-        FILL ME : This function should return a set of transitions of size `batch_size` sampled from `self.buffer`
-
-        Input:
-            * `batch_size` (`int`): the size of the sample.
-
-        Output:
-            * A 5-tuple (`states`, `actions`, `rewards`, `next_states`, `dones`),
-                * `states`      (`torch.tensor` [batch_size, channel, height, width])
-                * `actions`     (`torch.tensor` [batch_size, 1])
-                * `rewards`     (`torch.tensor` [batch_size, 1])
-                * `next_states` (`torch.tensor` [batch_size, channel, height, width])
-                * `dones`       (`torch.tensor` [batch_size, 1])
-              All `torch.tensor` (except `actions`) should have a datatype `torch.float` and resides in torch device
-              `device`.
-        '''
         transition_dict_list = random.sample(self.buffer, batch_size)
         state_tensor_list = []
         action_tensor_list = []
@@ -65,22 +32,23 @@ class ReplayMemory():
             next_state_tensor_list.append(transition["next_state"])
             done_tensor_list.append(transition["done"])
 
-        '''
-        May not need for proj. Use for testing in assignment env.
-        '''
-        stateTensor = torch.tensor(state_tensor_list).float().to(device)
-        actionTensor = torch.tensor(action_tensor_list).to(device)
-        rewardTensor = torch.tensor(reward_tensor_list).float().to(device)
-        nextStateTensor = torch.tensor(next_state_tensor_list).float().to(device)
-        doneTensor = torch.tensor(done_tensor_list).float().to(device)
+        transition = {
+                    'state': torch.tensor(state_tensor_list).float().to(device),
+                    'action': torch.tensor(action_tensor_list).to(device),
+                    'reward': torch.tensor(reward_tensor_list).float().to(device),
+                    'next_state': torch.tensor(next_state_tensor_list).float().to(device),
+                    'done': torch.tensor(done_tensor_list).float().to(device)
+                    }
+        # stateTensor = torch.tensor(state_tensor_list).float().to(device)
+        # actionTensor = torch.tensor(action_tensor_list).to(device)
+        # rewardTensor = torch.tensor(reward_tensor_list).float().to(device)
+        # nextStateTensor = torch.tensor(next_state_tensor_list).float().to(device)
+        # doneTensor = torch.tensor(done_tensor_list).float().to(device)
 
-        return stateTensor, actionTensor, rewardTensor, nextStateTensor, doneTensor
+        return transition
         pass
 
     def __len__(self):
-        '''
-        Return the length of the replay buffer.
-        '''
         return len(self.buffer)
 
 
