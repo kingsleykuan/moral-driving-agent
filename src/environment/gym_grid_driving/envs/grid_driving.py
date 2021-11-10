@@ -532,6 +532,31 @@ class World(object):
         if self.state.finish_position:
             t[2, self.state.finish_position.x, self.state.finish_position.y] = 1
         t[3, :, :] = self.state.occupancy_trails
+        for obs in self.state.observations:
+            t[4, obs.pos[0], obs.pos[1]] = obs.feat.PedPed
+            t[5, obs.pos[0], obs.pos[1]] = obs.feat.Barrier
+            t[6, obs.pos[0], obs.pos[1]] = obs.feat.CrossingSignal
+            t[7, obs.pos[0], obs.pos[1]] = obs.feat.Man
+            t[8, obs.pos[0], obs.pos[1]] = obs.feat.Woman
+            t[9, obs.pos[0], obs.pos[1]] = obs.feat.Pregnant
+            t[10, obs.pos[0], obs.pos[1]] = obs.feat.Stroller
+            t[11, obs.pos[0], obs.pos[1]] = obs.feat.OldMan
+            t[12, obs.pos[0], obs.pos[1]] = obs.feat.OldWoman
+            t[13, obs.pos[0], obs.pos[1]] = obs.feat.Boy
+            t[14, obs.pos[0], obs.pos[1]] = obs.feat.Girl
+            t[15, obs.pos[0], obs.pos[1]] = obs.feat.Homeless
+            t[16, obs.pos[0], obs.pos[1]] = obs.feat.LargeWoman
+            t[17, obs.pos[0], obs.pos[1]] = obs.feat.LargeMan
+            t[18, obs.pos[0], obs.pos[1]] = obs.feat.Criminal
+            t[19, obs.pos[0], obs.pos[1]] = obs.feat.MaleExecutive
+            t[20, obs.pos[0], obs.pos[1]] = obs.feat.FemaleExecutive
+            t[21, obs.pos[0], obs.pos[1]] = obs.feat.FemaleAthlete
+            t[22, obs.pos[0], obs.pos[1]] = obs.feat.MaleAthlete
+            t[23, obs.pos[0], obs.pos[1]] = obs.feat.FemaleDoctor
+            t[24, obs.pos[0], obs.pos[1]] = obs.feat.MaleDoctor
+            t[25, obs.pos[0], obs.pos[1]] = obs.feat.Dog
+            t[26, obs.pos[0], obs.pos[1]] = obs.feat.Cat
+
         if pytorch:
             t = np.transpose(t, (0, 2, 1))  # [C, H, W]
         assert t.shape == self.tensor_space(pytorch).shape
@@ -617,7 +642,7 @@ class World(object):
 
     @property
     def tensor_shape(self):
-        return (4, self.boundary.w, self.boundary.h)
+        return (27, self.boundary.w, self.boundary.h)
 
 
 def get_range(remaining_step, current_number, target_number, step_size):
