@@ -26,7 +26,7 @@ ENV_CONFIG = {
     'moral_reward_model_path': 'models/moral_reward',
     'features': [
         FeatSpec(
-            1, 5,     # id, max
+            1, True, 5,  # id, random, max
             [0, 1],    # PedPed
             [0, 1],    # Barrier
             [0, 2],    # CrossingSignal
@@ -51,7 +51,7 @@ ENV_CONFIG = {
             [0, 5],    # Dog
             [0, 5]),   # Cat
         FeatSpec(
-            2, 5,     # id, max
+            2, True, 5,  # id, random, max
             [0, 1],    # PedPed
             [0, 1],    # Barrier
             [0, 2],    # CrossingSignal
