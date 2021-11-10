@@ -12,8 +12,11 @@ from enum import Enum
 import copy
 
 import logging
-
 logger = logging.getLogger(__name__)
+
+import torch
+from moral_rewards.model import MoralRewardModel
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 random = None
 
@@ -754,6 +757,17 @@ class MoralGridDrivingEnv(gym.Env):
 
         self.action_space = spaces.Discrete(len(self.actions))
 
+        moral_reward_model_path = kwargs.get('moral_reward_model_path', None)
+        if moral_reward_model_path:
+            self.moral_reward_model = MoralRewardModel.load(
+                moral_reward_model_path)
+            self.moral_reward_model = self.moral_reward_model.eval()
+            self.moral_reward_model = self.moral_reward_model.to(device)
+        else:
+            self.moral_reward_model = None
+            logger.warn(
+                "No MoralRewardModel loaded, no moral rewards will be given.")
+
         self.reset()
 
     def seed(self, seed=None):
@@ -788,7 +802,26 @@ class MoralGridDrivingEnv(gym.Env):
         except AgentBarrierCrashException:
             reward = self.rewards.BARRIER_CRASH_REWARD
         except AgentInObservation:
-            reward = 42
+            if self.moral_reward_model is not None:
+                for moral_obs in self.world.state.observations:
+                    agent_x = self.world.state.agent.position.x
+                    agent_y = self.world.state.agent.position.y
+                    moral_obs_x = moral_obs.pos[0]
+                    moral_obs_y = moral_obs.pos[1]
+
+                    if agent_x == moral_obs_x and agent_y == moral_obs_y:
+                        # Extract moral scenario features
+                        moral_obs_feat = moral_obs.feat[2:]
+                        moral_obs_feat = torch.tensor(
+                            moral_obs_feat, dtype=torch.float, device=device)
+                        moral_obs_feat = torch.unsqueeze(moral_obs_feat, 0)
+
+                        # Get moral reward from model
+                        reward = self.moral_reward_model(moral_obs_feat)
+                        reward = reward['rewards'].item()
+                        break
+            else:
+                reward = 0
 
         self.update_state()
 

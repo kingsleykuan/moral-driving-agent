@@ -1,16 +1,16 @@
 import gym
+from gym.envs.registration import register
+
 from environment.gym_grid_driving.envs.grid_driving import (
     FeatSpec, LaneSpec, ObsSpec, SparseReward)
+from .dqn_trainer import DQNTrainer
+from .model import DQNModel
 
-from gym.envs.registration import register
 register(
     id='MoralGridDriving-v0',
     entry_point=(
         'environment.gym_grid_driving.envs.grid_driving:MoralGridDrivingEnv')
 )
-
-from .dqn_trainer import DQNTrainer
-from .model import DQNModel
 
 ENV_CONFIG = {
     'lanes': [
@@ -23,57 +23,58 @@ ENV_CONFIG = {
     'random_lane_speed': False,
     'ensure_initial_solvable': False,
 
+    'moral_reward_model_path': 'models/moral_reward',
     'features': [
         FeatSpec(
-            1, 10,
-            [0, 1],
-            [0, 1],
-            [0, 1],
-            [0, 3],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10]),
+            1, 10,     # id, max
+            [0, 1],    # PedPed
+            [0, 1],    # Barrier
+            [0, 1],    # CrossingSignal
+            [0, 3],    # Man
+            [0, 10],   # Woman
+            [0, 10],   # Pregnant
+            [0, 10],   # Stroller
+            [0, 10],   # OldMan
+            [0, 10],   # OldWoman
+            [0, 10],   # Boy
+            [0, 10],   # Girl
+            [0, 10],   # Homeless
+            [0, 10],   # LargeWoman
+            [0, 10],   # LargeMan
+            [0, 10],   # Criminal
+            [0, 10],   # MaleExecutive
+            [0, 10],   # FemaleExecutive
+            [0, 10],   # FemaleAthlete
+            [0, 10],   # MaleAthlete
+            [0, 10],   # FemaleDoctor
+            [0, 10],   # MaleDoctor
+            [0, 10],   # Dog
+            [0, 10]),  # Cat
         FeatSpec(
-            2, 10,
-            [0, 1],
-            [0, 1],
-            [0, 1],
-            [0, 3],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10],
-            [0, 10]),
+            2, 10,     # id, max
+            [0, 1],    # PedPed
+            [0, 1],    # Barrier
+            [0, 1],    # CrossingSignal
+            [0, 3],    # Man
+            [0, 10],   # Woman
+            [0, 10],   # Pregnant
+            [0, 10],   # Stroller
+            [0, 10],   # OldMan
+            [0, 10],   # OldWoman
+            [0, 10],   # Boy
+            [0, 10],   # Girl
+            [0, 10],   # Homeless
+            [0, 10],   # LargeWoman
+            [0, 10],   # LargeMan
+            [0, 10],   # Criminal
+            [0, 10],   # MaleExecutive
+            [0, 10],   # FemaleExecutive
+            [0, 10],   # FemaleAthlete
+            [0, 10],   # MaleAthlete
+            [0, 10],   # FemaleDoctor
+            [0, 10],   # MaleDoctor
+            [0, 10],   # Dog
+            [0, 10]),  # Cat
         ],
     'observations': [
         ObsSpec(1, (1, 1)),
