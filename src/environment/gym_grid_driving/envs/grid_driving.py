@@ -683,7 +683,7 @@ def generate_random_lane_speed(lanes):
     return [LaneSpec(lane.cars, random_speed_range(lane.speed_range)) for lane in lanes]
 
 
-class GridDrivingEnv(gym.Env):
+class MoralGridDrivingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, **kwargs):

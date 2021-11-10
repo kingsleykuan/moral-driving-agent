@@ -1,5 +1,13 @@
 import gym
-from gym_grid_driving.envs.grid_driving import LaneSpec, SparseReward
+from environment.gym_grid_driving.envs.grid_driving import (
+    FeatSpec, LaneSpec, ObsSpec, SparseReward)
+
+from gym.envs.registration import register
+register(
+    id='MoralGridDriving-v0',
+    entry_point=(
+        'environment.gym_grid_driving.envs.grid_driving:MoralGridDrivingEnv')
+)
 
 from .dqn_trainer import DQNTrainer
 from .model import DQNModel
@@ -15,6 +23,63 @@ ENV_CONFIG = {
     'random_lane_speed': False,
     'ensure_initial_solvable': False,
 
+    'features': [
+        FeatSpec(
+            1, 10,
+            [0, 1],
+            [0, 1],
+            [0, 1],
+            [0, 3],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10]),
+        FeatSpec(
+            2, 10,
+            [0, 1],
+            [0, 1],
+            [0, 1],
+            [0, 3],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10],
+            [0, 10]),
+        ],
+    'observations': [
+        ObsSpec(1, (1, 1)),
+        ObsSpec(2, (1, 2))
+    ],
+
     'agent_speed_range': [-2, -1],
 
     'rewards': SparseReward,
@@ -27,7 +92,7 @@ ENV_CONFIG = {
 
 
 def load_env(env_config):
-    return gym.make('GridDriving-v0', **env_config)
+    return gym.make('MoralGridDriving-v0', **env_config)
 
 
 def load_model(input_shape, num_actions):
