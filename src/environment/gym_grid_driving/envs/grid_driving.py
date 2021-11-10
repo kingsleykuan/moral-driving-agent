@@ -432,7 +432,7 @@ class World(object):
                 total = 0
                 idxs = []
                 while total < feat.max:
-                    idx = random.random_integers(0, len(people))
+                    idx = random.randint(0, len(people))
                     total += people[idx]
                     idxs.append(idx)
 
