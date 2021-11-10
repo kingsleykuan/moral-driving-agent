@@ -41,8 +41,9 @@ def main(env_config):
     trainer = DQNTrainer(
         env,
         model,
-        log_dir='runs/dqn',
-        save_path='models/dqn')
+        log_dir='runs/double_dqn',
+        save_path='models/double_dqn',
+        double_dqn=True)
 
     trainer.train()
 
