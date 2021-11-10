@@ -64,6 +64,7 @@ class DQNTrainer:
             log_dir=None,
             save_path=None,
             device=None,
+            double_dqn=True,
             gamma=0.999,
             epsilon_start=0.9,
             epsilon_end=0.05,
@@ -112,6 +113,7 @@ class DQNTrainer:
         self.episode = 1
         self.global_step = 1
 
+        self.double_dqn = double_dqn
         self.gamma = gamma
         self.epsilon_start = epsilon_start
         self.epsilon_end = epsilon_end
@@ -243,9 +245,15 @@ class DQNTrainer:
 
         with torch.no_grad():
             # Get max_a(Q(s', a)) of the next state
-            target_model_q_values = torch.max(
-                self.target_model(next_states)['rewards'],
-                dim=-1, keepdim=True)[0]
+            if self.double_dqn:
+                next_actions = torch.argmax(
+                    self.model(next_states)['rewards'], dim=-1, keepdim=True)
+                target_model_q_values = torch.gather(
+                    self.target_model(next_states)['rewards'], 1, next_actions)
+            else:
+                target_model_q_values = torch.max(
+                    self.target_model(next_states)['rewards'],
+                    dim=-1, keepdim=True)[0]
 
             # Set Q value of terminal states to 0
             mask = 1 - dones
