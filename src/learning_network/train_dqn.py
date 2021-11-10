@@ -2,7 +2,7 @@ import gym
 from gym.envs.registration import register
 
 from environment.gym_grid_driving.envs.grid_driving import (
-    FeatSpec, LaneSpec, ObsSpec, SparseReward)
+    FeatSpec, LaneSpec, ObsSpec, DenseReward)
 from .dqn_trainer import DQNTrainer
 from .model import DQNModel
 
@@ -26,55 +26,55 @@ ENV_CONFIG = {
     'moral_reward_model_path': 'models/moral_reward',
     'features': [
         FeatSpec(
-            1, 10,     # id, max
+            1, 5,     # id, max
             [0, 1],    # PedPed
             [0, 1],    # Barrier
-            [0, 1],    # CrossingSignal
-            [0, 3],    # Man
-            [0, 10],   # Woman
-            [0, 10],   # Pregnant
-            [0, 10],   # Stroller
-            [0, 10],   # OldMan
-            [0, 10],   # OldWoman
-            [0, 10],   # Boy
-            [0, 10],   # Girl
-            [0, 10],   # Homeless
-            [0, 10],   # LargeWoman
-            [0, 10],   # LargeMan
-            [0, 10],   # Criminal
-            [0, 10],   # MaleExecutive
-            [0, 10],   # FemaleExecutive
-            [0, 10],   # FemaleAthlete
-            [0, 10],   # MaleAthlete
-            [0, 10],   # FemaleDoctor
-            [0, 10],   # MaleDoctor
-            [0, 10],   # Dog
-            [0, 10]),  # Cat
+            [0, 2],    # CrossingSignal
+            [0, 5],    # Man
+            [0, 5],    # Woman
+            [0, 5],    # Pregnant
+            [0, 5],    # Stroller
+            [0, 5],    # OldMan
+            [0, 5],    # OldWoman
+            [0, 5],    # Boy
+            [0, 5],    # Girl
+            [0, 5],    # Homeless
+            [0, 5],    # LargeWoman
+            [0, 5],    # LargeMan
+            [0, 5],    # Criminal
+            [0, 5],    # MaleExecutive
+            [0, 5],    # FemaleExecutive
+            [0, 5],    # FemaleAthlete
+            [0, 5],    # MaleAthlete
+            [0, 5],    # FemaleDoctor
+            [0, 5],    # MaleDoctor
+            [0, 5],    # Dog
+            [0, 5]),   # Cat
         FeatSpec(
-            2, 10,     # id, max
+            2, 5,     # id, max
             [0, 1],    # PedPed
             [0, 1],    # Barrier
-            [0, 1],    # CrossingSignal
-            [0, 3],    # Man
-            [0, 10],   # Woman
-            [0, 10],   # Pregnant
-            [0, 10],   # Stroller
-            [0, 10],   # OldMan
-            [0, 10],   # OldWoman
-            [0, 10],   # Boy
-            [0, 10],   # Girl
-            [0, 10],   # Homeless
-            [0, 10],   # LargeWoman
-            [0, 10],   # LargeMan
-            [0, 10],   # Criminal
-            [0, 10],   # MaleExecutive
-            [0, 10],   # FemaleExecutive
-            [0, 10],   # FemaleAthlete
-            [0, 10],   # MaleAthlete
-            [0, 10],   # FemaleDoctor
-            [0, 10],   # MaleDoctor
-            [0, 10],   # Dog
-            [0, 10]),  # Cat
+            [0, 2],    # CrossingSignal
+            [0, 5],    # Man
+            [0, 5],    # Woman
+            [0, 5],    # Pregnant
+            [0, 5],    # Stroller
+            [0, 5],    # OldMan
+            [0, 5],    # OldWoman
+            [0, 5],    # Boy
+            [0, 5],    # Girl
+            [0, 5],    # Homeless
+            [0, 5],    # LargeWoman
+            [0, 5],    # LargeMan
+            [0, 5],    # Criminal
+            [0, 5],    # MaleExecutive
+            [0, 5],    # FemaleExecutive
+            [0, 5],    # FemaleAthlete
+            [0, 5],    # MaleAthlete
+            [0, 5],    # FemaleDoctor
+            [0, 5],    # MaleDoctor
+            [0, 5],    # Dog
+            [0, 5]),   # Cat
         ],
     'observations': [
         ObsSpec(1, (1, 1)),
@@ -83,7 +83,7 @@ ENV_CONFIG = {
 
     'agent_speed_range': [-2, -1],
 
-    'rewards': SparseReward,
+    'rewards': DenseReward,
     'observation_type': 'tensor',
     'mask': None,
     'stochasticity': 0.0,

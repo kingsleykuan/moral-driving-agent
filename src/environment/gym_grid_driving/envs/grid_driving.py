@@ -40,8 +40,8 @@ class DenseReward:
     MISSED_REWARD = -5
     CRASH_REWARD = -20
     TIMESTEP_REWARD = -1
-    INVALID_CHOICE_REWARD = -100  # Crashes into invalid sides when forced to do trolley
-    BARRIER_CRASH_REWARD = -10  # Crashes into barrier after observing
+    INVALID_CHOICE_REWARD = -20  # Crashes into invalid sides when forced to do trolley
+    BARRIER_CRASH_REWARD = -1    # Crashes into barrier after observing
 
 
 class SparseReward:
@@ -60,12 +60,56 @@ class DefaultConfig:
         LaneSpec(3, [-3, -1]),
     ]
     FEAT = [
-        FeatSpec(1, 10, [0, 1], [0, 1], [0, 1], [0, 3], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10]),
-        FeatSpec(2, 10, [0, 0], [0, 0], [0, 0], [0, 3], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10])
+        FeatSpec(
+            1, 5,     # id, max
+            [0, 1],    # PedPed
+            [0, 1],    # Barrier
+            [0, 2],    # CrossingSignal
+            [0, 5],    # Man
+            [0, 5],    # Woman
+            [0, 5],    # Pregnant
+            [0, 5],    # Stroller
+            [0, 5],    # OldMan
+            [0, 5],    # OldWoman
+            [0, 5],    # Boy
+            [0, 5],    # Girl
+            [0, 5],    # Homeless
+            [0, 5],    # LargeWoman
+            [0, 5],    # LargeMan
+            [0, 5],    # Criminal
+            [0, 5],    # MaleExecutive
+            [0, 5],    # FemaleExecutive
+            [0, 5],    # FemaleAthlete
+            [0, 5],    # MaleAthlete
+            [0, 5],    # FemaleDoctor
+            [0, 5],    # MaleDoctor
+            [0, 5],    # Dog
+            [0, 5]),   # Cat
+        FeatSpec(
+            2, 5,     # id, max
+            [0, 1],    # PedPed
+            [0, 1],    # Barrier
+            [0, 2],    # CrossingSignal
+            [0, 5],    # Man
+            [0, 5],    # Woman
+            [0, 5],    # Pregnant
+            [0, 5],    # Stroller
+            [0, 5],    # OldMan
+            [0, 5],    # OldWoman
+            [0, 5],    # Boy
+            [0, 5],    # Girl
+            [0, 5],    # Homeless
+            [0, 5],    # LargeWoman
+            [0, 5],    # LargeMan
+            [0, 5],    # Criminal
+            [0, 5],    # MaleExecutive
+            [0, 5],    # FemaleExecutive
+            [0, 5],    # FemaleAthlete
+            [0, 5],    # MaleAthlete
+            [0, 5],    # FemaleDoctor
+            [0, 5],    # MaleDoctor
+            [0, 5],    # Dog
+            [0, 5]),   # Cat
     ]
     OBS = [
         ObsSpec(1, (1, 1)),
@@ -387,11 +431,11 @@ class World(object):
             total = 0
             idxs = []
             while total < feat.max:
-                idx = random.random_integers(0, 21)
+                idx = random.random_integers(0, len(people))
                 total += people[idx]
                 idxs.append(idx)
 
-            for i in range(0, 21):
+            for i in range(0, len(people)):
                 if not i in idxs:
                     people[i] = 0
 
@@ -819,6 +863,7 @@ class MoralGridDrivingEnv(gym.Env):
                         # Get moral reward from model
                         reward = self.moral_reward_model(moral_obs_feat)
                         reward = reward['rewards'].item()
+                        reward += self.rewards.TIMESTEP_REWARD
                         break
             else:
                 reward = 0
