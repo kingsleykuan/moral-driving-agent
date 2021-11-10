@@ -102,6 +102,10 @@ class AgentBarrierCrashException(Exception):
     pass
 
 
+class AgentInObservation(Exception):
+    pass
+
+
 class Point(object):
     def __init__(self, x=0, y=0):
         self.x = x
@@ -466,7 +470,7 @@ class World(object):
                     if obs.feat.Barrier == 1:
                         occupancies[obs.pos] = 3
                     else:
-                        occupancies[obs.pos] = 0
+                        occupancies[obs.pos] = 4
 
                 # Handle car jump pass through other car
                 if self.agent and occupancies[self.agent.position.x, self.agent.position.y] == 1:
@@ -482,6 +486,10 @@ class World(object):
                 if self.agent and occupancies[self.agent.position.x, self.agent.position.y] == 3:
                     self.agent_state = AgentState.crashed
                     raise AgentBarrierCrashException
+
+                # Handle car go through observation
+                if self.agent and occupancies[self.agent.position.x, self.agent.position.y] == 4:
+                    raise AgentInObservation
 
                 # Handle car jump pass through finish
                 if self.agent and self.finish_position and self.agent.position == self.finish_position:
@@ -754,6 +762,8 @@ class GridDrivingEnv(gym.Env):
             reward = self.rewards.INVALID_CHOICE_REWARD
         except AgentBarrierCrashException:
             reward = self.rewards.BARRIER_CRASH_REWARD
+        except AgentInObservation:
+            reward = 42
 
         self.update_state()
 
