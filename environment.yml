@@ -22,3 +22,4 @@ dependencies:
   - torchaudio
   - cudatoolkit=11.1
   - tensorboard
+  - gym
