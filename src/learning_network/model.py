@@ -1,69 +1,22 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.autograd as autograd
-import collections
-import random
 
 from base.base_model import BaseModel
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-class ReplayMemory():
-    def __init__(self, memory_size):
-        self.buffer = collections.deque([], maxlen=memory_size)
-        pass
-
-    def push(self, transition):
-        self.buffer.append(transition)
-        pass
-
-    def sample(self, batch_size):
-        transition_dict_list = random.sample(self.buffer, batch_size)
-        state_tensor_list = []
-        action_tensor_list = []
-        reward_tensor_list = []
-        next_state_tensor_list = []
-        done_tensor_list = []
-        for transition in transition_dict_list:
-            state_tensor_list.append(transition["state"])
-            action_tensor_list.append(transition["action"])
-            reward_tensor_list.append(transition["reward"])
-            next_state_tensor_list.append(transition["next_state"])
-            done_tensor_list.append(transition["done"])
-
-        transition = {
-                    'state': torch.tensor(state_tensor_list).float().to(device),
-                    'action': torch.tensor(action_tensor_list).to(device),
-                    'reward': torch.tensor(reward_tensor_list).float().to(device),
-                    'next_state': torch.tensor(next_state_tensor_list).float().to(device),
-                    'done': torch.tensor(done_tensor_list).float().to(device)
-                    }
-        # stateTensor = torch.tensor(state_tensor_list).float().to(device)
-        # actionTensor = torch.tensor(action_tensor_list).to(device)
-        # rewardTensor = torch.tensor(reward_tensor_list).float().to(device)
-        # nextStateTensor = torch.tensor(next_state_tensor_list).float().to(device)
-        # doneTensor = torch.tensor(done_tensor_list).float().to(device)
-
-        return transition
-        pass
-
-    def __len__(self):
-        return len(self.buffer)
 
 
 class DQNModel(BaseModel):
     def __init__(
             self,
-            input_size,
+            input_shape,
             num_actions,
             dropout_rate=0.1,
             **kwargs):
         super(DQNModel, self).__init__()
 
-        self.input_size = input_size
-        self.dropout_rate = dropout_rate
+        self.input_shape = input_shape
         self.num_actions = num_actions
+        self.dropout_rate = dropout_rate
 
         modifier = 0
         layer_1_out = 2 << (4 + modifier)
@@ -71,18 +24,20 @@ class DQNModel(BaseModel):
         layer_3_out = 2 << (6 + modifier)
         fully_connected_out = 2 << (7 + modifier)
 
-        self.fc_1 = nn.Conv2d(self.input_shape[2], layer_1_out, kernel_size=2, bias=False)
+        self.conv_1 = nn.Conv2d(self.input_shape[0], layer_1_out, kernel_size=2, bias=False)
         self.batch_norm_1 = nn.BatchNorm2d(layer_1_out)
-        self.fc_2 = nn.Conv2d(layer_1_out, layer_2_out, kernel_size=2, bias=False)
+        self.conv_2 = nn.Conv2d(layer_1_out, layer_2_out, kernel_size=2, bias=False)
         self.batch_norm_2 = nn.BatchNorm2d(layer_2_out)
-        self.fc_3 = nn.Conv2d(layer_2_out, layer_3_out, kernel_size=2, bias=False)
+        self.conv_3 = nn.Conv2d(layer_2_out, layer_3_out, kernel_size=2, bias=False)
         self.batch_norm_3 = nn.BatchNorm2d(layer_3_out)
 
         feature_out_size = self.calc_feature_size(input_shape)
         self.feature_layer = nn.Linear(feature_out_size, fully_connected_out)
         self.action_layer = nn.Linear(fully_connected_out, self.num_actions)
 
-        self.dropout = nn.Dropout(self.dropout_rate)
+        self.dropout_2d = nn.Dropout2d(self.dropout_rate)
+
+        self.init_parameters()
 
     def calc_feature_size(self, starting_input_shape):
         # assuming input shape following (channel, height, width)
@@ -103,58 +58,63 @@ class DQNModel(BaseModel):
 
         return numel
 
-        self.init_parameters()
-
     def config(self):
         config = {
-            'input_size': self.input_size,
-            'hidden_size': self.hidden_size,
+            'input_shape': self.input_shape,
+            'num_actions': self.num_actions,
             'dropout_rate': self.dropout_rate,
         }
         return config
 
     def init_parameters(self):
         with torch.no_grad():
-            nn.init.kaiming_uniform_(self.fc_1.weight, nonlinearity='relu')
-            nn.init.kaiming_uniform_(self.fc_2.weight, nonlinearity='relu')
-            nn.init.kaiming_uniform_(self.fc_3.weight, nonlinearity='linear')
-            nn.init.constant_(self.fc_3.bias, 0)
+            nn.init.kaiming_uniform_(self.conv_1.weight, nonlinearity='relu')
+            nn.init.kaiming_uniform_(self.conv_2.weight, nonlinearity='relu')
+            nn.init.kaiming_uniform_(self.conv_3.weight, nonlinearity='relu')
+
+            nn.init.kaiming_uniform_(
+                self.feature_layer.weight, nonlinearity='relu')
+            nn.init.constant_(self.feature_layer.bias, 0)
+
+            nn.init.kaiming_uniform_(
+                self.action_layer.weight, nonlinearity='linear')
+            nn.init.constant_(self.feature_layer.bias, 0)
 
     def reset_parameters(self):
-        self.batch_norm_input.reset_parameters()
-
-        self.fc_1.reset_parameters()
+        self.conv_1.reset_parameters()
         self.batch_norm_1.reset_parameters()
 
-        self.fc_2.reset_parameters()
+        self.conv_2.reset_parameters()
         self.batch_norm_2.reset_parameters()
 
-        self.fc_3.reset_parameters()
+        self.conv_3.reset_parameters()
+        self.batch_norm_3.reset_parameters()
+
+        self.feature_layer.reset_parameters()
+        self.action_layer.reset_parameters()
 
         self.init_parameters()
 
     def forward(self, features, **kwargs):
-        features = self.fc_1(features)
+        features = self.conv_1(features)
         features = self.batch_norm_1(features)
         features = F.relu(features)
-        features = self.dropout(features)
+        features = self.dropout_2d(features)
 
-        features = self.fc_2(features)
+        features = self.conv_2(features)
         features = self.batch_norm_2(features)
         features = F.relu(features)
-        features = self.dropout(features)
+        features = self.dropout_2d(features)
 
-        features = self.fc_3(features)
+        features = self.conv_3(features)
         features = self.batch_norm_3(features)
         features = F.relu(features)
-        features = self.dropout(features)
+        features = self.dropout_2d(features)
 
-        features = self.feature_in_layer(features)
+        features = torch.flatten(features, start_dim=1, end_dim=-1)
+        features = self.feature_layer(features)
         features = F.relu(features)
-        features = self.action_out_layer(features)
-
-        features = torch.sigmoid(features)
-        features = torch.squeeze(features, dim=-1)
+        features = self.action_layer(features)
 
         outputs = {
             'rewards': features,
