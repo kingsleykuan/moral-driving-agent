@@ -1,3 +1,5 @@
+from typing import List
+
 import gym
 from gym import error, spaces, utils
 from gym.utils import seeding
@@ -10,31 +12,41 @@ from enum import Enum
 import copy
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-
 random = None
-
 
 AgentState = Enum('AgentState', 'alive crashed finished out')
 
 LaneSpec = namedtuple('LaneSpec', ['cars', 'speed_range'])
-GridDrivingState = namedtuple('GridDrivingState', ['cars', 'agent', 'finish_position', 'occupancy_trails', 'agent_state'])
+GridDrivingState = namedtuple('GridDrivingState',
+                              ['cars', 'agent', 'finish_position', 'occupancy_trails', 'agent_state', 'observations'])
 MaskSpec = namedtuple('MaskSpec', ['type', 'radius'])
+FeatSpec = namedtuple('FeatSpec',
+                      ['id', 'PedPed', 'Barrier', 'CrossingSignal', 'Man', 'Woman', 'Pregnant', 'Stroller', 'OldMan',
+                       'OldWoman', 'Boy', 'Girl', 'Homeless', 'LargeWoman', 'LargeMan',
+                       'Criminal', 'MaleExecutive', 'FemaleExecutive', 'FemaleAthlete', 'MaleAthlete', 'FemaleDoctor',
+                       'MaleDoctor', 'Dog', 'Cat'])
+ObsSpec = namedtuple('ObsSpec', ['id', 'pos'])
 
 
 class DenseReward:
-    FINISH_REWARD   = 100
-    MISSED_REWARD   = -5
-    CRASH_REWARD    = -20
+    FINISH_REWARD = 100
+    MISSED_REWARD = -5
+    CRASH_REWARD = -20
     TIMESTEP_REWARD = -1
+    INVALID_CHOICE_REWARD = -100  # Crashes into invalid sides when forced to do trolley
+    BARRIER_CRASH_REWARD = -10  # Crashes into barrier after observing
 
 
 class SparseReward:
-    FINISH_REWARD   = 10
-    MISSED_REWARD   = 0
-    CRASH_REWARD    = 0
+    FINISH_REWARD = 10
+    MISSED_REWARD = 0
+    CRASH_REWARD = 0
     TIMESTEP_REWARD = 0
+    INVALID_CHOICE_REWARD = 0
+    BARRIER_CRASH_REWARD = 0
 
 
 class DefaultConfig:
@@ -43,26 +55,50 @@ class DefaultConfig:
         LaneSpec(2, [-3, -3]),
         LaneSpec(3, [-3, -1]),
     ]
+    FEAT = [
+        FeatSpec(1, [0, 1], [0, 1], [0, 1], [0, 3], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
+                 [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
+                 [0, 10]),
+        FeatSpec(2, [0, 0], [0, 0], [0, 0], [0, 3], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
+                 [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
+                 [0, 10])
+    ]
+    OBS = [
+        ObsSpec(1, (1, 1)),
+        ObsSpec(2, (1, 2))
+    ]
+
     WIDTH = 10
     PLAYER_SPEED_RANGE = [-1, -1]
     STOCHASTICITY = 1.0
 
 
-class ActionNotFoundException(Exception): 
+class ActionNotFoundException(Exception):
     pass
+
 
 class AgentCrashedException(Exception):
     pass
 
+
 class AgentOutOfBoundaryException(Exception):
     pass
+
 
 class AgentFinishedException(Exception):
     pass
 
+
 class CarNotStartedException(Exception):
     pass
-        
+
+
+class InvalidChoiceException(Exception):
+    pass
+
+
+class AgentBarrierCrashException(Exception):
+    pass
 
 
 class Point(object):
@@ -71,23 +107,23 @@ class Point(object):
         self.y = y
 
     def __add__(self, other):
-        return Point(self.x + other.x, self.y + other.y) 
+        return Point(self.x + other.x, self.y + other.y)
 
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
 
     def __mul__(self, other):
-        return Point(self.x * other, self.y * other) 
+        return Point(self.x * other, self.y * other)
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
     def __str__(self):
         return "Point(x={},y={})".format(self.x, self.y)
-      
+
     def __repr__(self):
         return str(self)
-      
+
     def __hash__(self):
         return hash(str(self))
 
@@ -121,13 +157,22 @@ class Rectangle(object):
         return "Rectangle(w={},h={},x={},y={})".format(self.w, self.h, self.x, self.y)
 
 
+class Observation(object):
+    def __init__(self, id, pos, feat: FeatSpec):
+        self.id = id
+        self.pos = pos
+        self.feat = feat
+
+
 class Car(object):
-    def __init__(self, position, speed_range, world, circular=True, auto_brake=True, auto_lane=True, p=1.0, id=None, ignore=False):
+    def __init__(self, position, speed_range, world, circular=True, auto_brake=True, auto_lane=True, p=1.0, id=None,
+                 ignore=False):
         self.id = id
         self.position = position
         self.speed_range = speed_range
         self.world = world
-        self.bound = self.world.boundary.circular_bound if self.world and self.world.boundary and circular else lambda x, **kwargs: x
+        self.bound = self.world.boundary.circular_bound if self.world and self.world.boundary and circular else lambda \
+                x, **kwargs: x
         self.auto_brake = auto_brake
         self.auto_lane = auto_lane
         self.p = p
@@ -139,7 +184,7 @@ class Car(object):
     def sample_speed(self):
         if random.random_sample() > self.p:
             return np.round(np.average(self.speed_range))
-        return random.randint(*tuple(np.array(self.speed_range)+np.array([0, 1])))
+        return random.randint(*tuple(np.array(self.speed_range) + np.array([0, 1])))
 
     def _start(self, **kwargs):
         delta = kwargs.get('delta', Point(0, 0))
@@ -169,7 +214,8 @@ class Car(object):
         self.position = target
 
     def step(self, **kwargs):
-        self._step(Point(self.direction if self.destination.x != self.position.x else 0, np.sign(self.destination.y - self.position.y)))
+        self._step(Point(self.direction if self.destination.x != self.position.x else 0,
+                         np.sign(self.destination.y - self.position.y)))
 
     def need_step(self):
         return self.position != self.destination
@@ -187,7 +233,7 @@ class Car(object):
     @property
     def lane(self):
         return self.position.y
-    
+
     def __repr__(self):
         return "Car({}, {}, {})".format(self.id, self.position, self.speed_range)
 
@@ -233,7 +279,7 @@ class OrderedLane(object):
         self.cars_recognized = [car for car in self.cars if not car.ignored]
 
     def front(self, car):
-        if car not in self.cars_recognized: # car is ignored
+        if car not in self.cars_recognized:  # car is ignored
             return self.cars[self.cars.index(car) - 1]
         return self.cars_recognized[self.cars_recognized.index(car) - 1]
 
@@ -251,8 +297,9 @@ class OrderedLane(object):
             for i, car in enumerate(cars):
                 if self.gap(car) > 1:
                     return i
+
         index = first_gap_index(self.cars)
-        return self.cars[index:]+self.cars[:index]
+        return self.cars[index:] + self.cars[:index]
 
     def __repr__(self):
         view = np.chararray(self.world.boundary.w, unicode=True, itemsize=2)
@@ -281,18 +328,54 @@ class Mask(object):
 
     def get(self):
         return Rectangle(self.radius * 2, self.radius * 2, self.target.x - self.radius, self.target.y - self.radius)
-        
+
+    def isInCone(self, pos):
+        relative_x = self.target.x - pos.x
+        relative_y = self.target.y - pos.y
+        return 0 <= relative_x < self.radius and relative_x >= abs(relative_y)
+
 
 class World(object):
+    features: List[FeatSpec]
+    observations: List[Observation]
+
     def __init__(self, boundary, finish_position=None, flicker_rate=0.0, mask=None):
         self.boundary = boundary
         self.finish_position = finish_position
         self.flicker_rate = flicker_rate
         self.mask = Mask(mask.type, mask.radius, self.boundary) if mask else None
 
-    def init(self, cars, agent=None):
+    def init(self, cars, observations, features, agent=None):
         self.cars = cars
         self.ordered_cars = sorted(self.cars, key=lambda car: car.position.x + self.boundary.w * car.position.y)
+        self.features = [FeatSpec(feat.id, random.random_integers(feat.PedPed[0], feat.PedPed[1]),
+                                  random.random_integers(feat.Barrier[0], feat.Barrier[1]),
+                                  random.random_integers(feat.CrossingSignal[0], feat.CrossingSignal[1]),
+                                  random.random_integers(feat.Man[0], feat.Man[1]),
+                                  random.random_integers(feat.Woman[0], feat.Woman[1]),
+                                  random.random_integers(feat.Pregnant[0], feat.Pregnant[1]),
+                                  random.random_integers(feat.Stroller[0], feat.Stroller[1]),
+                                  random.random_integers(feat.OldMan[0], feat.OldMan[1]),
+                                  random.random_integers(feat.OldWoman[0], feat.OldWoman[1]),
+                                  random.random_integers(feat.Boy[0], feat.Boy[1]),
+                                  random.random_integers(feat.Girl[0], feat.Girl[1]),
+                                  random.random_integers(feat.Homeless[0], feat.Homeless[1]),
+                                  random.random_integers(feat.LargeWoman[0], feat.LargeWoman[1]),
+                                  random.random_integers(feat.LargeMan[0], feat.LargeMan[1]),
+                                  random.random_integers(feat.Criminal[0], feat.Criminal[1]),
+                                  random.random_integers(feat.MaleExecutive[0], feat.MaleExecutive[1]),
+                                  random.random_integers(feat.FemaleExecutive[0], feat.FemaleExecutive[1]),
+                                  random.random_integers(feat.FemaleAthlete[0], feat.FemaleAthlete[1]),
+                                  random.random_integers(feat.MaleAthlete[0], feat.MaleAthlete[1]),
+                                  random.random_integers(feat.FemaleDoctor[0], feat.FemaleDoctor[1]),
+                                  random.random_integers(feat.MaleDoctor[0], feat.MaleDoctor[1]),
+                                  random.random_integers(feat.Dog[0], feat.Dog[1]),
+                                  random.random_integers(feat.Cat[0], feat.Cat[1])) for feat in features]
+        self.force_decision_col = set()
+        self.observations = []
+        for obs in observations:
+            self.force_decision_col.add(obs.pos[0])
+            self.observations.append(Observation(obs.id, obs.pos, [f for f in self.features if f.id == obs.id][0]))
         self.agent = agent
         self.max_dist_travel = np.max([np.max(np.absolute(car.speed_range)) for car in cars])
         self.lanes = [OrderedLane(self) for i in range(self.boundary.h)]
@@ -343,14 +426,34 @@ class World(object):
 
                         if car != self.agent:
                             occupancies[car.position.x, car.position.y] = 1
-                            
+
                         if last_y != car.position.y:
                             self.reassign_lanes()
 
+                for decision_cols in self.force_decision_col:
+                    for y in range(len(self.lanes)):
+                        occupancies[decision_cols, y] = 2
+
+                for obs in self.observations:
+                    if obs.feat.Barrier == 1:
+                        occupancies[obs.pos] = 3
+                    else:
+                        occupancies[obs.pos] = 0
+
                 # Handle car jump pass through other car
-                if self.agent and occupancies[self.agent.position.x, self.agent.position.y] > 0:
+                if self.agent and occupancies[self.agent.position.x, self.agent.position.y] == 1:
                     self.agent_state = AgentState.crashed
                     raise AgentCrashedException
+
+                # Handle car go through invalid
+                if self.agent and occupancies[self.agent.position.x, self.agent.position.y] == 2:
+                    self.agent_state = AgentState.crashed
+                    raise InvalidChoiceException
+
+                # Handle car go through barrier
+                if self.agent and occupancies[self.agent.position.x, self.agent.position.y] == 3:
+                    self.agent_state = AgentState.crashed
+                    raise AgentBarrierCrashException
 
                 # Handle car jump pass through finish
                 if self.agent and self.finish_position and self.agent.position == self.finish_position:
@@ -360,8 +463,8 @@ class World(object):
                 self.occupancy_trails = np.clip(self.occupancy_trails + occupancies, 0, 1)
 
             if self.agent and self.occupancy_trails[self.agent.position.x, self.agent.position.y] > 0:
-                    self.agent_state = AgentState.crashed
-                    raise AgentCrashedException
+                self.agent_state = AgentState.crashed
+                raise AgentCrashedException
             if self.agent and not self.boundary.contains(self.agent.position):
                 self.agent_state = AgentState.out
                 raise AgentOutOfBoundaryException
@@ -394,7 +497,7 @@ class World(object):
             t[2, self.state.finish_position.x, self.state.finish_position.y] = 1
         t[3, :, :] = self.state.occupancy_trails
         if pytorch:
-            t = np.transpose(t, (0, 2, 1)) # [C, H, W]
+            t = np.transpose(t, (0, 2, 1))  # [C, H, W]
         assert t.shape == self.tensor_space(pytorch).shape
         return t
 
@@ -439,15 +542,15 @@ class World(object):
         other_cars = set(self.cars) - set([self.agent])
         finish_position = self.finish_position
         occupancy_trails = self.occupancy_trails
-        agent_state = self.agent_state 
+        agent_state = self.agent_state
 
         if self.mask:
             mask = self.mask.get()
             agent = agent if mask.contains(agent.position) else None
-            other_cars = set([car for car in list(other_cars) if mask.contains(car.position)])
+            other_cars = set([car for car in list(other_cars) if self.mask.isInCone(car.position)])
             finish_position = finish_position if mask.contains(finish_position) else None
             occupancy_trails_mask = np.full(self.occupancy_trails.shape, False)
-            occupancy_trails_mask[mask.x:mask.x+mask.w, mask.y:mask.y+mask.h] = True
+            occupancy_trails_mask[mask.x:mask.x + mask.w, mask.y:mask.y + mask.h] = True
             occupancy_trails[~occupancy_trails_mask] = 0.0
 
         if self.blackout:
@@ -461,7 +564,8 @@ class World(object):
 
         if hasattr(self, '_state'):
             del self._state
-        self._state = GridDrivingState(cp(other_cars), cp(agent), cp(finish_position), cp(occupancy_trails), cp(agent_state))
+        self._state = GridDrivingState(cp(other_cars), cp(agent), cp(finish_position), cp(occupancy_trails),
+                                       cp(agent_state), cp(self.observations))
 
     @property
     def tensor_state(self):
@@ -482,17 +586,18 @@ class World(object):
 
 def get_range(remaining_step, current_number, target_number, step_size):
     distance = target_number - current_number
-    
+
     min_range = distance - step_size * (remaining_step - 1)
     max_range = distance + step_size * (remaining_step - 1)
-    
+
     min_range = max(min_range, -step_size)
     min_range = min(min_range, step_size)
-    
+
     max_range = max(max_range, -step_size)
     max_range = min(max_range, step_size)
-    
+
     return (min_range, max_range)
+
 
 def get_trajectory(start, end, direction, step_size, boundary=None):
     assert step_size > 0 and abs(direction) in range(1, 2)
@@ -504,7 +609,7 @@ def get_trajectory(start, end, direction, step_size, boundary=None):
         if remaining_step <= 0:
             break
         a, b = get_range(remaining_step, y, end.y, step_size)
-        diff = random.randint(a, b+1)
+        diff = random.randint(a, b + 1)
         x += direction
         y += diff
         new = Point(x, y)
@@ -512,7 +617,8 @@ def get_trajectory(start, end, direction, step_size, boundary=None):
             new = boundary.bound(new)
         trajectory.append(new)
     return trajectory
-  
+
+
 def sample_points_outside(points, boundary, ns):
     used_points = [] + points
     all_points = []
@@ -530,10 +636,12 @@ def sample_points_outside(points, boundary, ns):
         result.append(points)
     return result
 
+
 def random_speed_range(speed_range):
-    min_speed = random.randint(speed_range[0], speed_range[1]+1)
-    max_speed = random.randint(min_speed, speed_range[1]+1)
+    min_speed = random.randint(speed_range[0], speed_range[1] + 1)
+    max_speed = random.randint(min_speed, speed_range[1] + 1)
     return [min_speed, max_speed]
+
 
 def generate_random_lane_speed(lanes):
     return [LaneSpec(lane.cars, random_speed_range(lane.speed_range)) for lane in lanes]
@@ -547,13 +655,15 @@ class GridDrivingEnv(gym.Env):
 
         self.lanes = kwargs.get('lanes', DefaultConfig.LANES)
         self.width = kwargs.get('width', DefaultConfig.WIDTH)
+        self.observations = kwargs.get('observations', DefaultConfig.OBS)
+        self.features = kwargs.get('features', DefaultConfig.FEAT)
         self.random_lane_speed = kwargs.get('random_lane_speed', False)
 
         if self.random_lane_speed: self.lanes_orig = self.lanes
 
         self.agent_speed_range = kwargs.get('agent_speed_range', DefaultConfig.PLAYER_SPEED_RANGE)
         self.finish_position = kwargs.get('finish_position', Point(0, 0))
-        self.agent_pos_init = kwargs.get('agent_pos_init', Point(self.width-1, len(self.lanes)-1))
+        self.agent_pos_init = kwargs.get('agent_pos_init', Point(self.width - 1, len(self.lanes) - 1))
 
         self.p = kwargs.get('stochasticity', DefaultConfig.STOCHASTICITY)
         self.observation_type = kwargs.get('observation_type', 'state')
@@ -568,16 +678,18 @@ class GridDrivingEnv(gym.Env):
         self.agent_ignore = kwargs.get('agent_ignore', False)
 
         self.rewards = kwargs.get('rewards', SparseReward)
-        rewards = [self.rewards.TIMESTEP_REWARD, self.rewards.CRASH_REWARD, self.rewards.MISSED_REWARD, self.rewards.FINISH_REWARD]
+        rewards = [self.rewards.TIMESTEP_REWARD, self.rewards.CRASH_REWARD, self.rewards.MISSED_REWARD,
+                   self.rewards.FINISH_REWARD, self.rewards.INVALID_CHOICE_REWARD, self.rewards.BARRIER_CRASH_REWARD]
         self.reward_range = (min(rewards), max(rewards))
 
         self.boundary = Rectangle(self.width, len(self.lanes))
-        self.world = World(self.boundary, finish_position=self.finish_position, flicker_rate=self.flicker_rate, mask=self.mask_spec)
+        self.world = World(self.boundary, finish_position=self.finish_position, flicker_rate=self.flicker_rate,
+                           mask=self.mask_spec)
 
         agent_direction = np.sign(self.agent_speed_range[0])
-        self.actions = [Action('up', Point(agent_direction,-1)), Action('down', Point(agent_direction,1))]
-        self.actions += [Action('forward[{}]'.format(i), Point(i, 0)) 
-                            for i in range(self.agent_speed_range[0], self.agent_speed_range[1]+1)]
+        self.actions = [Action('up', Point(agent_direction, -1)), Action('down', Point(agent_direction, 1))]
+        self.actions += [Action('forward[{}]'.format(i), Point(i, 0))
+                         for i in range(self.agent_speed_range[0], self.agent_speed_range[1] + 1)]
 
         self.action_space = spaces.Discrete(len(self.actions))
 
@@ -610,6 +722,10 @@ class GridDrivingEnv(gym.Env):
             reward = self.rewards.MISSED_REWARD
         except AgentFinishedException:
             reward = self.rewards.FINISH_REWARD
+        except InvalidChoiceException:
+            reward = self.rewards.INVALID_CHOICE_REWARD
+        except AgentBarrierCrashException:
+            reward = self.rewards.BARRIER_CRASH_REWARD
 
         self.update_state()
 
@@ -631,15 +747,15 @@ class GridDrivingEnv(gym.Env):
 
         return self.state
 
-
     def distribute_cars(self):
         cars = []
         i = 0
         for y, lane in enumerate(self.lanes):
-            choices = list(range(0, self.agent.position.x)) + list(range(self.agent.position.x+1, self.width)) if self.agent.lane == y else range(self.width)
+            choices = list(range(0, self.agent.position.x)) + list(
+                range(self.agent.position.x + 1, self.width)) if self.agent.lane == y else range(self.width)
             xs = random.choice(choices, lane.cars, replace=False)
             for x in xs:
-                cars.append(Car(Point(x,y), lane.speed_range, self.world, p=self.p, id=i))
+                cars.append(Car(Point(x, y), lane.speed_range, self.world, p=self.p, id=i))
                 i += 1
         return cars
 
@@ -660,17 +776,18 @@ class GridDrivingEnv(gym.Env):
         if self.random_lane_speed:
             self.lanes = generate_random_lane_speed(self.lanes_orig)
             if self.random_seed is not None:
-                self.random_seed += 1 # increment random seed to get different (but deterministic) lanes
+                self.random_seed += 1  # increment random seed to get different (but deterministic) lanes
 
-        self.agent = ActionableCar(self.agent_pos_init, self.agent_speed_range, self.world, circular=False, auto_brake=False, auto_lane=False, 
-                                    p=self.p, id='<', ignore=self.agent_ignore)
+        self.agent = ActionableCar(self.agent_pos_init, self.agent_speed_range, self.world, circular=False,
+                                   auto_brake=False, auto_lane=False,
+                                   p=self.p, id='<', ignore=self.agent_ignore)
         self.cars = [self.agent]
         if self.ensure_initial_solvable:
             self.cars += self.distribute_cars_solvable()
         else:
             self.cars += self.distribute_cars()
-        
-        self.world.init(self.cars, agent=self.agent)
+
+        self.world.init(self.cars, agent=self.agent, observations=self.observations, features=self.features)
 
         self.update_observation_space()
 
@@ -695,8 +812,8 @@ class GridDrivingEnv(gym.Env):
             n_cars = sum([l.cars for l in self.lanes])
             self.observation_space = spaces.Dict({
                 'cars': spaces.Tuple(tuple([self.world.tensor_space(channel=False) for i in range(n_cars)])),
-                'agent_pos': self.world.tensor_space(channel=False), 
-                'finish_pos': self.world.tensor_space(channel=False), 
+                'agent_pos': self.world.tensor_space(channel=False),
+                'finish_pos': self.world.tensor_space(channel=False),
                 'occupancy_trails': spaces.MultiBinary(self.world.tensor_space(channel=False).shape)
             })
 
@@ -709,6 +826,11 @@ class GridDrivingEnv(gym.Env):
         for car in self.world.state.cars:
             if car != self.world.state.agent:
                 view[car.position.tuple] = car.id or 'O'
+        for col in self.world.force_decision_col:
+            for y in range(len(self.lanes)):
+                view[col, y] = '|'
+        for obs in self.world.state.observations:
+            view[obs.pos] = '@'
         if self.world.state.finish_position and self.boundary.contains(self.world.state.finish_position):
             view[self.world.state.finish_position.tuple] += 'F'
         if self.world.state.agent and self.boundary.contains(self.world.state.agent.position):
@@ -729,4 +851,3 @@ class GridDrivingEnv(gym.Env):
     @property
     def done(self):
         return self.world.state.agent_state != AgentState.alive
-    
