@@ -22,14 +22,14 @@ CONFIG = {
     'num_epochs': 50,
     'steps_per_log': 100,
     'epochs_per_eval': 5,
-    'batch_size': 1024,
+    'batch_size': 8192,
     'num_workers': 4,
     'learning_rate': 1e-3,
     'weight_decay': 1e-5,
 
-    'num_features': 24,
-    'hidden_size': 64,
-    'dropout_rate': 0.5,
+    'num_features': 23,
+    'hidden_size': 128,
+    'dropout_rate': 0.1,
 
     'random_seed': 0,
 }
@@ -106,10 +106,10 @@ class MoralRewardTrainer(Trainer):
         }
 
         # Join data into [batch_size, 2]
-        # Reward correct preference (which group to sacrifice)
+        # Reward correct preference (which group to save)
         rewards = torch.stack((rewards_not_saved, rewards_saved), dim=-1)
         loss = F.cross_entropy(
-            rewards, torch.zeros_like(rewards_saved, dtype=int))
+            rewards, torch.ones_like(rewards_saved, dtype=int))
 
         return outputs, loss
 
@@ -145,14 +145,14 @@ class MoralRewardTrainer(Trainer):
         rewards_not_saved = torch.cat(rewards_not_saved, dim=0)
         rewards_saved = torch.cat(rewards_saved, dim=0)
 
-        # Correct preference (which group to sacrifice)
-        preferences = rewards_not_saved > rewards_saved
+        # Correct preference (which group to save)
+        preferences = rewards_not_saved < rewards_saved
         preferences = preferences.cpu().numpy()
 
         self.current_f1_score = f1_score(
             np.ones_like(preferences),
             preferences,
-            average='binary',
+            average='micro',
             zero_division=0)
         accuracy = accuracy_score(np.ones_like(preferences), preferences)
 
@@ -190,7 +190,7 @@ def main(
         num_workers=4,
         learning_rate=1e-3,
         weight_decay=1e-5,
-        num_features=24,
+        num_features=23,
         hidden_size=32,
         dropout_rate=0.5,
         random_seed=0):

@@ -74,7 +74,7 @@ class MoralRewardModel(BaseModel):
         features = self.dropout(features)
 
         features = self.fc_3(features)
-        features = torch.sigmoid(features)
+        features = -torch.sigmoid(features)
         features = torch.squeeze(features, dim=-1)
 
         outputs = {
