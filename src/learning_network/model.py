@@ -8,61 +8,53 @@ from base.base_model import BaseModel
 class DQNModel(BaseModel):
     def __init__(
             self,
-            input_shape,
+            input_channels,
             num_actions,
             dropout_rate=0.1,
             **kwargs):
         super(DQNModel, self).__init__()
 
-        self.input_shape = input_shape
+        self.input_channels = input_channels
         self.num_actions = num_actions
         self.dropout_rate = dropout_rate
 
         modifier = 0
-        layer_1_out = 2 << (4 + modifier)
-        layer_2_out = 2 << (5 + modifier)
+        layer_1_out = 2 << (6 + modifier)
+        layer_2_out = 2 << (6 + modifier)
         layer_3_out = 2 << (6 + modifier)
-        fully_connected_out = 2 << (7 + modifier)
+        layer_4_out = 2 << (6 + modifier)
+        layer_5_out = 2 << (6 + modifier)
+        fully_connected_out = 2 << (5 + modifier)
 
-        self.batch_norm_input = nn.BatchNorm2d(self.input_shape[0])
+        self.batch_norm_input = nn.BatchNorm2d(self.input_channels)
 
-        self.conv_1 = nn.Conv2d(self.input_shape[0], layer_1_out, kernel_size=2, bias=False)
+        self.conv_1 = nn.Conv2d(self.input_channels, layer_1_out, kernel_size=3, padding="same", bias=False)
         self.batch_norm_1 = nn.BatchNorm2d(layer_1_out)
-        self.conv_2 = nn.Conv2d(layer_1_out, layer_2_out, kernel_size=2, bias=False)
+
+        self.conv_2 = nn.Conv2d(layer_1_out, layer_2_out, kernel_size=3, padding="same", bias=False)
         self.batch_norm_2 = nn.BatchNorm2d(layer_2_out)
-        self.conv_3 = nn.Conv2d(layer_2_out, layer_3_out, kernel_size=2, bias=False)
+
+        self.conv_3 = nn.Conv2d(layer_2_out, layer_3_out, kernel_size=3, padding="same", bias=False)
         self.batch_norm_3 = nn.BatchNorm2d(layer_3_out)
 
-        feature_out_size = self.calc_feature_size(input_shape)
-        self.feature_layer = nn.Linear(feature_out_size, fully_connected_out)
+        self.conv_4 = nn.Conv2d(layer_3_out, layer_4_out, kernel_size=3, padding="same", bias=False)
+        self.batch_norm_4 = nn.BatchNorm2d(layer_4_out)
+
+        self.conv_5 = nn.Conv2d(layer_4_out, layer_5_out, kernel_size=3, padding="same", bias=False)
+        self.batch_norm_5 = nn.BatchNorm2d(layer_5_out)
+
+        self.global_max_pool = nn.AdaptiveMaxPool2d(output_size=1)
+        self.feature_layer = nn.Linear(layer_5_out, fully_connected_out)
         self.action_layer = nn.Linear(fully_connected_out, self.num_actions)
 
         self.dropout_2d = nn.Dropout2d(self.dropout_rate)
+        self.dropout_1d = nn.Dropout(self.dropout_rate)
 
         self.init_parameters()
 
-    def calc_feature_size(self, starting_input_shape):
-        # assuming input shape following (channel, height, width)
-        layers = [module for module in self.modules()]
-        curr_shape = starting_input_shape
-        for layer in layers:
-            if (isinstance(layer, nn.Conv2d)):
-                new_shape_h = int(
-                    ((curr_shape[1] + 2 * layer.padding[0] - layer.dilation[0] * (layer.kernel_size[0] - 1) - 1) /
-                     layer.stride[0]) + 1)
-                new_shape_w = int(
-                    ((curr_shape[2] + 2 * layer.padding[1] - layer.dilation[1] * (layer.kernel_size[1] - 1) - 1) /
-                     layer.stride[1]) + 1)
-                curr_shape = (layer.out_channels, new_shape_h, new_shape_w)
-        numel = 1
-        for dim in curr_shape:
-            numel = numel * dim
-
-        return numel
-
     def config(self):
         config = {
-            'input_shape': self.input_shape,
+            'input_channels': self.input_channels,
             'num_actions': self.num_actions,
             'dropout_rate': self.dropout_rate,
         }
@@ -73,6 +65,8 @@ class DQNModel(BaseModel):
             nn.init.kaiming_uniform_(self.conv_1.weight, nonlinearity='relu')
             nn.init.kaiming_uniform_(self.conv_2.weight, nonlinearity='relu')
             nn.init.kaiming_uniform_(self.conv_3.weight, nonlinearity='relu')
+            nn.init.kaiming_uniform_(self.conv_4.weight, nonlinearity='relu')
+            nn.init.kaiming_uniform_(self.conv_5.weight, nonlinearity='relu')
 
             nn.init.kaiming_uniform_(
                 self.feature_layer.weight, nonlinearity='relu')
@@ -80,7 +74,7 @@ class DQNModel(BaseModel):
 
             nn.init.kaiming_uniform_(
                 self.action_layer.weight, nonlinearity='linear')
-            nn.init.constant_(self.feature_layer.bias, 0)
+            nn.init.constant_(self.action_layer.bias, 0)
 
     def reset_parameters(self):
         self.batch_norm_input.reset_parameters()
@@ -93,6 +87,12 @@ class DQNModel(BaseModel):
 
         self.conv_3.reset_parameters()
         self.batch_norm_3.reset_parameters()
+
+        self.conv_4.reset_parameters()
+        self.batch_norm_4.reset_parameters()
+
+        self.conv_5.reset_parameters()
+        self.batch_norm_5.reset_parameters()
 
         self.feature_layer.reset_parameters()
         self.action_layer.reset_parameters()
@@ -117,9 +117,22 @@ class DQNModel(BaseModel):
         features = F.relu(features)
         features = self.dropout_2d(features)
 
+        features = self.conv_4(features)
+        features = self.batch_norm_4(features)
+        features = F.relu(features)
+        features = self.dropout_2d(features)
+
+        features = self.conv_5(features)
+        features = self.batch_norm_5(features)
+        features = F.relu(features)
+        features = self.dropout_2d(features)
+
+        features = self.global_max_pool(features)
         features = torch.flatten(features, start_dim=1, end_dim=-1)
+
         features = self.feature_layer(features)
         features = F.relu(features)
+        features = self.dropout_1d(features)
         features = self.action_layer(features)
 
         outputs = {

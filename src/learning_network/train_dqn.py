@@ -99,13 +99,13 @@ def load_env(env_config):
     return gym.make('MoralGridDriving-v0', **env_config)
 
 
-def load_model(input_shape, num_actions):
-    return DQNModel(input_shape, num_actions, dropout_rate=0.1)
+def load_model(input_channels, num_actions):
+    return DQNModel(input_channels, num_actions, dropout_rate=0.1)
 
 
 def main(env_config):
     env = load_env(env_config)
-    model = load_model(env.observation_space.shape, env.action_space.n)
+    model = load_model(env.observation_space.shape[0], env.action_space.n)
 
     trainer = DQNTrainer(
         env,
