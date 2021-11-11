@@ -117,9 +117,9 @@ def main(model_path, data_path, env_config):
                 scenario_2_pos = scenario_env_config['observations'][1].pos
 
                 if next_state[1, scenario_1_pos[1], scenario_1_pos[0]] == 1:
-                    choice = 0
-                elif next_state[1, scenario_2_pos[1], scenario_2_pos[0]] == 1:
                     choice = 1
+                elif next_state[1, scenario_2_pos[1], scenario_2_pos[0]] == 1:
+                    choice = 0
 
                 if done:
                     break

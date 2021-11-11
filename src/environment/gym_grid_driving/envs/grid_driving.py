@@ -35,10 +35,12 @@ FeatSpec = namedtuple('FeatSpec',
                        'MaleDoctor', 'Dog', 'Cat'])
 ObsSpec = namedtuple('ObsSpec', ['id', 'pos'])
 
+MORAL_REWARD_SCALE = 5
+
 
 class DenseReward:
-    FINISH_REWARD = 10
-    MISSED_REWARD = 10
+    FINISH_REWARD = 20
+    MISSED_REWARD = 20
     CRASH_REWARD = -10
     TIMESTEP_REWARD = -1
     INVALID_CHOICE_REWARD = -10  # Crashes into invalid sides when forced to do trolley
@@ -867,7 +869,7 @@ class MoralGridDrivingEnv(gym.Env):
 
                         # Get moral reward from model
                         reward = self.moral_reward_model(moral_obs_feat)
-                        reward = reward['rewards'].item() * 5
+                        reward = reward['rewards'].item() * MORAL_REWARD_SCALE
                         reward += self.rewards.TIMESTEP_REWARD
                         break
             else:
