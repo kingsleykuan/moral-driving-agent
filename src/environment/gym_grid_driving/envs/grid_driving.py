@@ -817,6 +817,8 @@ class MoralGridDrivingEnv(gym.Env):
             logger.warn(
                 "No MoralRewardModel loaded, no moral rewards will be given.")
 
+        self.hit_observations = set()
+
         self.reset()
 
     def seed(self, seed=None):
@@ -869,6 +871,8 @@ class MoralGridDrivingEnv(gym.Env):
                         reward = self.moral_reward_model(moral_obs_feat)
                         reward = reward['rewards'].item() * 5
                         reward += self.rewards.TIMESTEP_REWARD
+
+                        self.hit_observations.add(moral_obs.id)
                         break
             else:
                 reward = 0
@@ -964,7 +968,7 @@ class MoralGridDrivingEnv(gym.Env):
             })
 
     def render(self, mode='human'):
-        if mode != 'human':
+        if mode not in ('human', 'ansi'):
             raise NotImplementedError
         cars = self.world.as_tensor(pytorch=False)[0, :, :]
         view = np.chararray(cars.shape, unicode=True, itemsize=3)
@@ -989,7 +993,10 @@ class MoralGridDrivingEnv(gym.Env):
             for y in range(len(self.lanes)):
                 view[col, y] = '|'
         for obs in self.world.state.observations:
-            view[obs.pos] = '@' + str(obs.id)
+            if obs.id in self.hit_observations:
+                view[obs.pos] = 'X' + str(obs.id)
+            else:
+                view[obs.pos] = '@' + str(obs.id)
         if self.world.state.finish_position and self.boundary.contains(self.world.state.finish_position):
             view[self.world.state.finish_position.tuple] += 'F'
         if self.world.state.agent and self.boundary.contains(self.world.state.agent.position):
@@ -999,16 +1006,31 @@ class MoralGridDrivingEnv(gym.Env):
                 view[self.world.state.agent.position.tuple] += '<'
         view[np.where(view == '')] = '-'
         view = np.transpose(view)
-        print(''.join('====' for i in view[0]))
-        for row in view:
-            print(' '.join('%03s' % i for i in row))
-        print(''.join('====' for i in view[0]))
 
+        output = []
+        output.append(''.join('====' for i in view[0]))
+        for row in view:
+            output.append(' '.join('%03s' % i for i in row))
+        output.append(''.join('====' for i in view[0]))
+
+        obs_output = []
         for obs in self.world.state.observations:
+            obs_output.append('Choice ')
             for name, count in obs.feat._asdict().items():
                 if count > 0:
-                    print(f'{name}: {count} | ', end='')
-            print()
+                    obs_output.append(f'{name}: {count}\t| ')
+            if obs.id in self.hit_observations:
+                obs_output.append('X')
+            obs_output.append('\n')
+        obs_output = ''.join(obs_output)
+        output.append(obs_output)
+
+        output = '\n'.join(output)
+
+        if mode == 'human':
+            print(output)
+        elif mode == 'ansi':
+            return output
 
     def close(self):
         pass
