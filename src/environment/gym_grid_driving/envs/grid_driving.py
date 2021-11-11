@@ -8,6 +8,7 @@ from gym import spaces
 import numpy as np
 from collections import namedtuple
 from enum import Enum
+import bisect
 
 import copy
 
@@ -968,14 +969,27 @@ class MoralGridDrivingEnv(gym.Env):
         cars = self.world.as_tensor(pytorch=False)[0, :, :]
         view = np.chararray(cars.shape, unicode=True, itemsize=3)
         view[self.world.state.occupancy_trails.nonzero()] = '~'
+        cols = list(self.world.force_decision_col)
+        insert_idx = bisect.bisect(cols, self.world.state.agent.position.tuple[0])
+        if insert_idx > len(cols) - 1:
+            left_idx = cols[len(cols) - 1]
+            right_idx = self.width
+        elif insert_idx == 0:
+            left_idx = 0
+            right_idx = cols[0]
+        else:
+            left_idx = cols[insert_idx - 1]
+            right_idx = cols[insert_idx]
+
         for car in self.world.state.cars:
             if car != self.world.state.agent:
-                view[car.position.tuple] = car.id or 'O'
+                if left_idx < car.position.tuple[0] < right_idx:
+                    view[car.position.tuple] = car.id or 'O'
         for col in self.world.force_decision_col:
             for y in range(len(self.lanes)):
                 view[col, y] = '|'
         for obs in self.world.state.observations:
-            view[obs.pos] = '@'
+            view[obs.pos] = '@' + str(obs.id)
         if self.world.state.finish_position and self.boundary.contains(self.world.state.finish_position):
             view[self.world.state.finish_position.tuple] += 'F'
         if self.world.state.agent and self.boundary.contains(self.world.state.agent.position):
