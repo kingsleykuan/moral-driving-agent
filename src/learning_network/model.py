@@ -24,6 +24,8 @@ class DQNModel(BaseModel):
         layer_3_out = 2 << (6 + modifier)
         fully_connected_out = 2 << (7 + modifier)
 
+        self.batch_norm_input = nn.BatchNorm2d(self.input_shape[0])
+
         self.conv_1 = nn.Conv2d(self.input_shape[0], layer_1_out, kernel_size=2, bias=False)
         self.batch_norm_1 = nn.BatchNorm2d(layer_1_out)
         self.conv_2 = nn.Conv2d(layer_1_out, layer_2_out, kernel_size=2, bias=False)
@@ -81,6 +83,8 @@ class DQNModel(BaseModel):
             nn.init.constant_(self.feature_layer.bias, 0)
 
     def reset_parameters(self):
+        self.batch_norm_input.reset_parameters()
+
         self.conv_1.reset_parameters()
         self.batch_norm_1.reset_parameters()
 
@@ -96,6 +100,8 @@ class DQNModel(BaseModel):
         self.init_parameters()
 
     def forward(self, features, **kwargs):
+        features = self.batch_norm_input(features)
+
         features = self.conv_1(features)
         features = self.batch_norm_1(features)
         features = F.relu(features)
