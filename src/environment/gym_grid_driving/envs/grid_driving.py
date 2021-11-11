@@ -12,8 +12,11 @@ from enum import Enum
 import copy
 
 import logging
-
 logger = logging.getLogger(__name__)
+
+import torch
+from moral_rewards.model import MoralRewardModel
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 random = None
 
@@ -24,7 +27,7 @@ GridDrivingState = namedtuple('GridDrivingState',
                               ['cars', 'agent', 'finish_position', 'occupancy_trails', 'agent_state', 'observations'])
 MaskSpec = namedtuple('MaskSpec', ['type', 'radius'])
 FeatSpec = namedtuple('FeatSpec',
-                      ['id', 'max', 'PedPed', 'Barrier', 'CrossingSignal', 'Man', 'Woman', 'Pregnant', 'Stroller',
+                      ['id', 'random', 'max', 'PedPed', 'Barrier', 'CrossingSignal', 'Man', 'Woman', 'Pregnant', 'Stroller',
                        'OldMan',
                        'OldWoman', 'Boy', 'Girl', 'Homeless', 'LargeWoman', 'LargeMan',
                        'Criminal', 'MaleExecutive', 'FemaleExecutive', 'FemaleAthlete', 'MaleAthlete', 'FemaleDoctor',
@@ -33,12 +36,12 @@ ObsSpec = namedtuple('ObsSpec', ['id', 'pos'])
 
 
 class DenseReward:
-    FINISH_REWARD = 100
-    MISSED_REWARD = -5
-    CRASH_REWARD = -20
+    FINISH_REWARD = 10
+    MISSED_REWARD = 10
+    CRASH_REWARD = -10
     TIMESTEP_REWARD = -1
-    INVALID_CHOICE_REWARD = -100  # Crashes into invalid sides when forced to do trolley
-    BARRIER_CRASH_REWARD = -10  # Crashes into barrier after observing
+    INVALID_CHOICE_REWARD = -10  # Crashes into invalid sides when forced to do trolley
+    BARRIER_CRASH_REWARD = -1    # Crashes into barrier after observing
 
 
 class SparseReward:
@@ -57,12 +60,56 @@ class DefaultConfig:
         LaneSpec(3, [-3, -1]),
     ]
     FEAT = [
-        FeatSpec(1, 10, [0, 1], [0, 1], [0, 1], [0, 3], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10]),
-        FeatSpec(2, 10, [0, 0], [0, 0], [0, 0], [0, 3], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10], [0, 10],
-                 [0, 10])
+        FeatSpec(
+            1, True, 5,  # id, random, max
+            [0, 1],    # PedPed
+            [0, 1],    # Barrier
+            [0, 2],    # CrossingSignal
+            [0, 5],    # Man
+            [0, 5],    # Woman
+            [0, 5],    # Pregnant
+            [0, 5],    # Stroller
+            [0, 5],    # OldMan
+            [0, 5],    # OldWoman
+            [0, 5],    # Boy
+            [0, 5],    # Girl
+            [0, 5],    # Homeless
+            [0, 5],    # LargeWoman
+            [0, 5],    # LargeMan
+            [0, 5],    # Criminal
+            [0, 5],    # MaleExecutive
+            [0, 5],    # FemaleExecutive
+            [0, 5],    # FemaleAthlete
+            [0, 5],    # MaleAthlete
+            [0, 5],    # FemaleDoctor
+            [0, 5],    # MaleDoctor
+            [0, 5],    # Dog
+            [0, 5]),   # Cat
+        FeatSpec(
+            2, True, 5,  # id, random, max
+            [0, 1],    # PedPed
+            [0, 1],    # Barrier
+            [0, 2],    # CrossingSignal
+            [0, 5],    # Man
+            [0, 5],    # Woman
+            [0, 5],    # Pregnant
+            [0, 5],    # Stroller
+            [0, 5],    # OldMan
+            [0, 5],    # OldWoman
+            [0, 5],    # Boy
+            [0, 5],    # Girl
+            [0, 5],    # Homeless
+            [0, 5],    # LargeWoman
+            [0, 5],    # LargeMan
+            [0, 5],    # Criminal
+            [0, 5],    # MaleExecutive
+            [0, 5],    # FemaleExecutive
+            [0, 5],    # FemaleAthlete
+            [0, 5],    # MaleAthlete
+            [0, 5],    # FemaleDoctor
+            [0, 5],    # MaleDoctor
+            [0, 5],    # Dog
+            [0, 5]),   # Cat
     ]
     OBS = [
         ObsSpec(1, (1, 1)),
@@ -357,46 +404,50 @@ class World(object):
         self.features = []
 
         for feat in features:
-            people = [random.random_integers(feat.PedPed[0], feat.PedPed[1]),
-                      random.random_integers(feat.Barrier[0], feat.Barrier[1]),
-                      random.random_integers(feat.CrossingSignal[0], feat.CrossingSignal[1]),
-                      random.random_integers(feat.Man[0], feat.Man[1]),
-                      random.random_integers(feat.Woman[0], feat.Woman[1]),
-                      random.random_integers(feat.Pregnant[0], feat.Pregnant[1]),
-                      random.random_integers(feat.Stroller[0], feat.Stroller[1]),
-                      random.random_integers(feat.OldMan[0], feat.OldMan[1]),
-                      random.random_integers(feat.OldWoman[0], feat.OldWoman[1]),
-                      random.random_integers(feat.Boy[0], feat.Boy[1]),
-                      random.random_integers(feat.Girl[0], feat.Girl[1]),
-                      random.random_integers(feat.Homeless[0], feat.Homeless[1]),
-                      random.random_integers(feat.LargeWoman[0], feat.LargeWoman[1]),
-                      random.random_integers(feat.LargeMan[0], feat.LargeMan[1]),
-                      random.random_integers(feat.Criminal[0], feat.Criminal[1]),
-                      random.random_integers(feat.MaleExecutive[0], feat.MaleExecutive[1]),
-                      random.random_integers(feat.FemaleExecutive[0], feat.FemaleExecutive[1]),
-                      random.random_integers(feat.FemaleAthlete[0], feat.FemaleAthlete[1]),
-                      random.random_integers(feat.MaleAthlete[0], feat.MaleAthlete[1]),
-                      random.random_integers(feat.FemaleDoctor[0], feat.FemaleDoctor[1]),
-                      random.random_integers(feat.MaleDoctor[0], feat.MaleDoctor[1]),
-                      random.random_integers(feat.Dog[0], feat.Dog[1]),
-                      random.random_integers(feat.Cat[0], feat.Cat[1])]
+            if feat.random:
+                people = [random.random_integers(feat.PedPed[0], feat.PedPed[1]),
+                        random.random_integers(feat.Barrier[0], feat.Barrier[1]),
+                        random.random_integers(feat.CrossingSignal[0], feat.CrossingSignal[1]),
+                        random.random_integers(feat.Man[0], feat.Man[1]),
+                        random.random_integers(feat.Woman[0], feat.Woman[1]),
+                        random.random_integers(feat.Pregnant[0], feat.Pregnant[1]),
+                        random.random_integers(feat.Stroller[0], feat.Stroller[1]),
+                        random.random_integers(feat.OldMan[0], feat.OldMan[1]),
+                        random.random_integers(feat.OldWoman[0], feat.OldWoman[1]),
+                        random.random_integers(feat.Boy[0], feat.Boy[1]),
+                        random.random_integers(feat.Girl[0], feat.Girl[1]),
+                        random.random_integers(feat.Homeless[0], feat.Homeless[1]),
+                        random.random_integers(feat.LargeWoman[0], feat.LargeWoman[1]),
+                        random.random_integers(feat.LargeMan[0], feat.LargeMan[1]),
+                        random.random_integers(feat.Criminal[0], feat.Criminal[1]),
+                        random.random_integers(feat.MaleExecutive[0], feat.MaleExecutive[1]),
+                        random.random_integers(feat.FemaleExecutive[0], feat.FemaleExecutive[1]),
+                        random.random_integers(feat.FemaleAthlete[0], feat.FemaleAthlete[1]),
+                        random.random_integers(feat.MaleAthlete[0], feat.MaleAthlete[1]),
+                        random.random_integers(feat.FemaleDoctor[0], feat.FemaleDoctor[1]),
+                        random.random_integers(feat.MaleDoctor[0], feat.MaleDoctor[1]),
+                        random.random_integers(feat.Dog[0], feat.Dog[1]),
+                        random.random_integers(feat.Cat[0], feat.Cat[1])]
 
-            total = 0
-            idxs = []
-            while total < feat.max:
-                idx = random.random_integers(0, 21)
-                total += people[idx]
-                idxs.append(idx)
+                total = 0
+                idxs = []
+                max_people = random.random_integers(0, feat.max)
+                while total < max_people:
+                    idx = random.randint(0, len(people))
+                    total += people[idx]
+                    idxs.append(idx)
 
-            for i in range(0, 21):
-                if not i in idxs:
-                    people[i] = 0
+                for i in range(0, len(people)):
+                    if not i in idxs:
+                        people[i] = 0
 
-            self.features.append(
-                FeatSpec(feat.id, 0, people[0], people[1], people[2], people[3], people[4], people[5], people[6],
-                         people[7], people[8], people[9], people[10], people[11], people[12], people[13], people[14],
-                         people[15], people[16], people[17], people[18], people[19], people[20], people[21],
-                         people[22]))
+                self.features.append(
+                    FeatSpec(feat.id, False, 0, people[0], people[1], people[2], people[3], people[4], people[5], people[6],
+                            people[7], people[8], people[9], people[10], people[11], people[12], people[13], people[14],
+                            people[15], people[16], people[17], people[18], people[19], people[20], people[21],
+                            people[22]))
+            else:
+                self.features.append(feat)
 
         # self.features = [
         #     FeatSpec(feat.id, 0, people[0], people[1], people[2], people[3], people[4], people[5], people[6], people[7],
@@ -708,7 +759,7 @@ def generate_random_lane_speed(lanes):
     return [LaneSpec(lane.cars, random_speed_range(lane.speed_range)) for lane in lanes]
 
 
-class GridDrivingEnv(gym.Env):
+class MoralGridDrivingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, **kwargs):
@@ -754,6 +805,17 @@ class GridDrivingEnv(gym.Env):
 
         self.action_space = spaces.Discrete(len(self.actions))
 
+        moral_reward_model_path = kwargs.get('moral_reward_model_path', None)
+        if moral_reward_model_path:
+            self.moral_reward_model = MoralRewardModel.load(
+                moral_reward_model_path)
+            self.moral_reward_model = self.moral_reward_model.eval()
+            self.moral_reward_model = self.moral_reward_model.to(device)
+        else:
+            self.moral_reward_model = None
+            logger.warn(
+                "No MoralRewardModel loaded, no moral rewards will be given.")
+
         self.reset()
 
     def seed(self, seed=None):
@@ -788,7 +850,27 @@ class GridDrivingEnv(gym.Env):
         except AgentBarrierCrashException:
             reward = self.rewards.BARRIER_CRASH_REWARD
         except AgentInObservation:
-            reward = 42
+            if self.moral_reward_model is not None:
+                for moral_obs in self.world.state.observations:
+                    agent_x = self.world.state.agent.position.x
+                    agent_y = self.world.state.agent.position.y
+                    moral_obs_x = moral_obs.pos[0]
+                    moral_obs_y = moral_obs.pos[1]
+
+                    if agent_x == moral_obs_x and agent_y == moral_obs_y:
+                        # Extract moral scenario features
+                        moral_obs_feat = moral_obs.feat[-23:]
+                        moral_obs_feat = torch.tensor(
+                            moral_obs_feat, dtype=torch.float, device=device)
+                        moral_obs_feat = torch.unsqueeze(moral_obs_feat, 0)
+
+                        # Get moral reward from model
+                        reward = self.moral_reward_model(moral_obs_feat)
+                        reward = reward['rewards'].item() * 5
+                        reward += self.rewards.TIMESTEP_REWARD
+                        break
+            else:
+                reward = 0
 
         self.update_state()
 
@@ -907,6 +989,12 @@ class GridDrivingEnv(gym.Env):
         for row in view:
             print(' '.join('%03s' % i for i in row))
         print(''.join('====' for i in view[0]))
+
+        for obs in self.world.state.observations:
+            for name, count in obs.feat._asdict().items():
+                if count > 0:
+                    print(f'{name}: {count} | ', end='')
+            print()
 
     def close(self):
         pass
