@@ -18,47 +18,27 @@ class DQNModel(BaseModel):
         self.num_actions = num_actions
         self.dropout_rate = dropout_rate
 
-        modifier = 0
-        layer_1_out = 2 << (4 + modifier)
-        layer_2_out = 2 << (5 + modifier)
+        modifier = 4
+        layer_1_out = 2 << (6 + modifier)
+        layer_2_out = 2 << (6 + modifier)
         layer_3_out = 2 << (6 + modifier)
         fully_connected_out = 2 << (7 + modifier)
 
         self.batch_norm_input = nn.BatchNorm2d(self.input_shape[0])
 
-        self.conv_1 = nn.Conv2d(self.input_shape[0], layer_1_out, kernel_size=2, bias=False)
+        self.conv_1 = nn.Conv2d(self.input_shape[0], layer_1_out, kernel_size=3, padding="same", bias=False)
         self.batch_norm_1 = nn.BatchNorm2d(layer_1_out)
-        self.conv_2 = nn.Conv2d(layer_1_out, layer_2_out, kernel_size=2, bias=False)
+        self.max_pool = nn.MaxPool2d(kernel_size=2)
+        self.conv_2 = nn.Conv2d(layer_1_out, layer_2_out, kernel_size=2, padding="same", bias=False)
         self.batch_norm_2 = nn.BatchNorm2d(layer_2_out)
-        self.conv_3 = nn.Conv2d(layer_2_out, layer_3_out, kernel_size=2, bias=False)
+        self.conv_3 = nn.Conv2d(layer_2_out, layer_3_out, kernel_size=2, padding="same", bias=False)
         self.batch_norm_3 = nn.BatchNorm2d(layer_3_out)
 
-        feature_out_size = self.calc_feature_size(input_shape)
-        self.feature_layer = nn.Linear(feature_out_size, fully_connected_out)
+        self.avg_pool = nn.AdaptiveAvgPool2d(output_size=1)
+        self.feature_layer = nn.Linear(layer_3_out, fully_connected_out)
         self.action_layer = nn.Linear(fully_connected_out, self.num_actions)
 
-        self.dropout_2d = nn.Dropout2d(self.dropout_rate)
-
         self.init_parameters()
-
-    def calc_feature_size(self, starting_input_shape):
-        # assuming input shape following (channel, height, width)
-        layers = [module for module in self.modules()]
-        curr_shape = starting_input_shape
-        for layer in layers:
-            if (isinstance(layer, nn.Conv2d)):
-                new_shape_h = int(
-                    ((curr_shape[1] + 2 * layer.padding[0] - layer.dilation[0] * (layer.kernel_size[0] - 1) - 1) /
-                     layer.stride[0]) + 1)
-                new_shape_w = int(
-                    ((curr_shape[2] + 2 * layer.padding[1] - layer.dilation[1] * (layer.kernel_size[1] - 1) - 1) /
-                     layer.stride[1]) + 1)
-                curr_shape = (layer.out_channels, new_shape_h, new_shape_w)
-        numel = 1
-        for dim in curr_shape:
-            numel = numel * dim
-
-        return numel
 
     def config(self):
         config = {
@@ -105,18 +85,19 @@ class DQNModel(BaseModel):
         features = self.conv_1(features)
         features = self.batch_norm_1(features)
         features = F.relu(features)
-        features = self.dropout_2d(features)
+        features = self.max_pool(features)
+        original = features
 
         features = self.conv_2(features)
         features = self.batch_norm_2(features)
         features = F.relu(features)
-        features = self.dropout_2d(features)
 
         features = self.conv_3(features)
         features = self.batch_norm_3(features)
+        features = features + original
         features = F.relu(features)
-        features = self.dropout_2d(features)
 
+        features = self.avg_pool(features)
         features = torch.flatten(features, start_dim=1, end_dim=-1)
         features = self.feature_layer(features)
         features = F.relu(features)
