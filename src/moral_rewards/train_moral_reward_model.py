@@ -152,7 +152,7 @@ class MoralRewardTrainer(Trainer):
         self.current_f1_score = f1_score(
             np.ones_like(preferences),
             preferences,
-            average='binary',
+            average='micro',
             zero_division=0)
         accuracy = accuracy_score(np.ones_like(preferences), preferences)
 
