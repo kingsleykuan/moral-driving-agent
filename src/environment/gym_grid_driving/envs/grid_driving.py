@@ -36,11 +36,11 @@ ObsSpec = namedtuple('ObsSpec', ['id', 'pos'])
 
 
 class DenseReward:
-    FINISH_REWARD = 100
-    MISSED_REWARD = -5
-    CRASH_REWARD = -20
+    FINISH_REWARD = 10
+    MISSED_REWARD = 10
+    CRASH_REWARD = -10
     TIMESTEP_REWARD = -1
-    INVALID_CHOICE_REWARD = -20  # Crashes into invalid sides when forced to do trolley
+    INVALID_CHOICE_REWARD = -10  # Crashes into invalid sides when forced to do trolley
     BARRIER_CRASH_REWARD = -1    # Crashes into barrier after observing
 
 
@@ -431,7 +431,8 @@ class World(object):
 
                 total = 0
                 idxs = []
-                while total < feat.max:
+                max_people = random.random_integers(0, feat.max)
+                while total < max_people:
                     idx = random.randint(0, len(people))
                     total += people[idx]
                     idxs.append(idx)
@@ -865,7 +866,7 @@ class MoralGridDrivingEnv(gym.Env):
 
                         # Get moral reward from model
                         reward = self.moral_reward_model(moral_obs_feat)
-                        reward = reward['rewards'].item()
+                        reward = reward['rewards'].item() * 5
                         reward += self.rewards.TIMESTEP_REWARD
                         break
             else:
@@ -988,6 +989,12 @@ class MoralGridDrivingEnv(gym.Env):
         for row in view:
             print(' '.join('%03s' % i for i in row))
         print(''.join('====' for i in view[0]))
+
+        for obs in self.world.state.observations:
+            for name, count in obs.feat._asdict().items():
+                if count > 0:
+                    print(f'{name}: {count} | ', end='')
+            print()
 
     def close(self):
         pass
