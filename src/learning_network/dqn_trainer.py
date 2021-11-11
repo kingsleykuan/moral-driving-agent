@@ -171,7 +171,9 @@ class DQNTrainer:
         state = torch.tensor(state, dtype=torch.float, device=self.device)
 
         for step in range(1, self.episode_max_len + 1):
+            self.model = self.model.eval()
             action = self.select_action(state)
+            self.model = self.model.train()
             next_state, reward, done, info = self.env.step(action)
 
             episode_reward += reward
