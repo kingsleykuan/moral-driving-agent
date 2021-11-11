@@ -21,7 +21,7 @@ register(
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-MAX_EVAL_SAMPLES = 10000
+MAX_EVAL_SAMPLES = 1000
 MODEL_PATH = 'models/double_dqn'
 DATA_PATH = 'data/moral_data_val.npz'
 
