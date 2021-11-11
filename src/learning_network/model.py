@@ -19,8 +19,8 @@ class DQNModel(BaseModel):
         self.dropout_rate = dropout_rate
 
         modifier = 4
-        layer_1_out = 2 << (6 + modifier)
-        layer_2_out = 2 << (6 + modifier)
+        layer_1_out = 2 << (4 + modifier)
+        layer_2_out = 2 << (5 + modifier)
         layer_3_out = 2 << (6 + modifier)
         fully_connected_out = 2 << (7 + modifier)
 
@@ -34,9 +34,11 @@ class DQNModel(BaseModel):
         self.conv_3 = nn.Conv2d(layer_2_out, layer_3_out, kernel_size=2, padding="same", bias=False)
         self.batch_norm_3 = nn.BatchNorm2d(layer_3_out)
 
-        self.avg_pool = nn.AdaptiveAvgPool2d(output_size=1)
+        self.avg_pool = nn.AdaptiveMaxPool2d(output_size=1)
         self.feature_layer = nn.Linear(layer_3_out, fully_connected_out)
         self.action_layer = nn.Linear(fully_connected_out, self.num_actions)
+
+        self.dropout = nn.Dropout(self.dropout_rate)
 
         self.init_parameters()
 
@@ -86,16 +88,19 @@ class DQNModel(BaseModel):
         features = self.batch_norm_1(features)
         features = F.relu(features)
         features = self.max_pool(features)
-        original = features
+        # original = features
+        features = self.dropout(features)
 
         features = self.conv_2(features)
         features = self.batch_norm_2(features)
         features = F.relu(features)
+        features = self.dropout(features)
 
         features = self.conv_3(features)
         features = self.batch_norm_3(features)
-        features = features + original
+        # features = features + original
         features = F.relu(features)
+        features = self.dropout(features)
 
         features = self.avg_pool(features)
         features = torch.flatten(features, start_dim=1, end_dim=-1)
