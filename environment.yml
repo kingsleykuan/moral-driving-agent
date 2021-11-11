@@ -1,8 +1,8 @@
 name: moral-agent
 channels:
-  - conda-forge
   - pytorch
   - nvidia
+  - conda-forge
 dependencies:
   - python=3.9
   - flake8
