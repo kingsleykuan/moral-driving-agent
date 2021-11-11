@@ -656,15 +656,17 @@ class World(object):
         finish_position = self.finish_position
         occupancy_trails = self.occupancy_trails
         agent_state = self.agent_state
+        observations = self.observations
 
         if self.mask:
             mask = self.mask.get()
             agent = agent if mask.contains(agent.position) else None
-            other_cars = set([car for car in list(other_cars) if self.mask.isInCone(car.position)])
+            other_cars = set([car for car in list(other_cars) if mask.contains(car.position)])
             finish_position = finish_position if mask.contains(finish_position) else None
             occupancy_trails_mask = np.full(self.occupancy_trails.shape, False)
             occupancy_trails_mask[mask.x:mask.x + mask.w, mask.y:mask.y + mask.h] = True
             occupancy_trails[~occupancy_trails_mask] = 0.0
+            observations = [x for x in observations if mask.contains(Point(x.pos[0], x.pos[1]))]
 
         if self.blackout:
             agent = None
@@ -678,7 +680,7 @@ class World(object):
         if hasattr(self, '_state'):
             del self._state
         self._state = GridDrivingState(cp(other_cars), cp(agent), cp(finish_position), cp(occupancy_trails),
-                                       cp(agent_state), cp(self.observations))
+                                       cp(agent_state), cp(observations))
 
     @property
     def tensor_state(self):
