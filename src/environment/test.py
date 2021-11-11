@@ -1,6 +1,11 @@
+"""
+Note: Run this from the 'src' directory using:
+python -m environment.test
+"""
+
 import gym
-import gym_grid_driving
-from gym_grid_driving.envs.grid_driving import LaneSpec, Point, FeatSpec, ObsSpec
+from gym.envs.registration import register
+from environment.gym_grid_driving.envs.grid_driving import LaneSpec, Point, FeatSpec, ObsSpec
 
 ### Sample test cases.
 test_config = {'lanes': [LaneSpec(1, [-2, -1])] * 5,
@@ -32,11 +37,18 @@ stochasticity = test_config['stochasticity']
 features = test_config['features']
 observations = test_config['observations']
 
-env = gym.make('GridDriving-v0', lanes=LANES, width=WIDTH,
+register(
+    id='MoralGridDriving-v0',
+    entry_point=(
+        'environment.gym_grid_driving.envs.grid_driving:MoralGridDrivingEnv')
+)
+
+env = gym.make('MoralGridDriving-v0', lanes=LANES, width=WIDTH,
                agent_speed_range=(-3, -1), finish_position=FIN_POS, agent_pos_init=AGENT_POS,
                stochasticity=stochasticity, features=features, observations=observations, tensor_state=False,
                flicker_rate=0., mask=None, random_seed=RANDOM_SEED)
 actions = env.actions
+env.reset()
 env.render()
 a = env.step(actions[1])
 env.render()
