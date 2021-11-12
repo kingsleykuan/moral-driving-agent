@@ -106,10 +106,10 @@ class MoralRewardTrainer(Trainer):
         }
 
         # Join data into [batch_size, 2]
-        # Reward correct preference (which group to save)
+        # Reward correct preference (which group to sacrifice)
         rewards = torch.stack((rewards_not_saved, rewards_saved), dim=-1)
         loss = F.cross_entropy(
-            rewards, torch.ones_like(rewards_saved, dtype=int))
+            rewards, torch.zeros_like(rewards_saved, dtype=int))
 
         return outputs, loss
 
@@ -145,8 +145,8 @@ class MoralRewardTrainer(Trainer):
         rewards_not_saved = torch.cat(rewards_not_saved, dim=0)
         rewards_saved = torch.cat(rewards_saved, dim=0)
 
-        # Correct preference (which group to save)
-        preferences = rewards_not_saved < rewards_saved
+        # Correct preference (which group to sacrifice)
+        preferences = rewards_not_saved > rewards_saved
         preferences = preferences.cpu().numpy()
 
         self.current_f1_score = f1_score(

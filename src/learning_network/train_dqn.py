@@ -89,7 +89,7 @@ ENV_CONFIG = {
     'rewards': DenseReward,
     'observation_type': 'tensor',
     'mask': None,
-    'stochasticity': 0.0,
+    'stochasticity': 1.0,
 
     'random_seed': None,
 }
@@ -112,6 +112,7 @@ def main(env_config):
         model,
         log_dir='runs/double_dqn',
         save_path='models/double_dqn',
+        save_incrementally=False,
         double_dqn=True)
 
     trainer.train()
