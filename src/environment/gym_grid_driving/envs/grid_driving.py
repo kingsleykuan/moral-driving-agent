@@ -35,7 +35,7 @@ FeatSpec = namedtuple('FeatSpec',
                        'MaleDoctor', 'Dog', 'Cat'])
 ObsSpec = namedtuple('ObsSpec', ['id', 'pos'])
 
-MORAL_REWARD_SCALE = 5
+MORAL_REWARD_SCALE = 10
 
 
 class DenseReward:
@@ -818,6 +818,11 @@ class MoralGridDrivingEnv(gym.Env):
             self.moral_reward_model = None
             logger.warn(
                 "No MoralRewardModel loaded, no moral rewards will be given.")
+        
+        self.episode_reward = 0
+        self.episode_driving_reward = 0
+        self.episode_moral_reward = 0
+        self.finished = False
 
         self.reset()
 
@@ -846,8 +851,10 @@ class MoralGridDrivingEnv(gym.Env):
             reward = self.rewards.CRASH_REWARD
         except AgentOutOfBoundaryException:
             reward = self.rewards.MISSED_REWARD
+            self.finished = True
         except AgentFinishedException:
             reward = self.rewards.FINISH_REWARD
+            self.finished = True
         except InvalidChoiceException:
             reward = self.rewards.INVALID_CHOICE_REWARD
         except AgentBarrierCrashException:
@@ -870,10 +877,15 @@ class MoralGridDrivingEnv(gym.Env):
                         # Get moral reward from model
                         reward = self.moral_reward_model(moral_obs_feat)
                         reward = reward['rewards'].item() * MORAL_REWARD_SCALE
+                        self.episode_moral_reward += reward
+                        self.episode_driving_reward -= reward
                         reward += self.rewards.TIMESTEP_REWARD
                         break
             else:
                 reward = 0
+        
+        self.episode_reward += reward
+        self.episode_driving_reward += reward
 
         self.update_state()
 
@@ -940,6 +952,11 @@ class MoralGridDrivingEnv(gym.Env):
         self.update_observation_space()
 
         self.update_state()
+
+        self.episode_reward = 0
+        self.episode_driving_reward = 0
+        self.episode_moral_reward = 0
+        self.finished = False
 
         return self.state
 
