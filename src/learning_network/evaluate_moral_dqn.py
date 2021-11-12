@@ -1,11 +1,12 @@
 import copy
 import random
+from pathlib import Path
 
 import gym
 import numpy as np
 import torch
 from gym.envs.registration import register
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 
 from environment.gym_grid_driving.envs.grid_driving import (
@@ -23,7 +24,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 MAX_EVAL_SAMPLES = 1000
 MODEL_PATH = 'models/double_dqn'
-DATA_PATH = 'data/moral_data_val.npz'
+DATA_PATH = 'data/moral_data_test.npz'
 
 ENV_CONFIG = {
     'lanes': [
@@ -50,7 +51,7 @@ ENV_CONFIG = {
     'rewards': DenseReward,
     'observation_type': 'tensor',
     'mask': None,
-    'stochasticity': 0.0,
+    'stochasticity': 1.0,
 
     'random_seed': 0,
 }
@@ -80,7 +81,6 @@ def main(model_path, data_path, env_config):
     data = load_data(data_path)
     for features in tqdm(data):
         saved = random.randint(0, 1)
-        ground_truths.append(saved)
 
         if saved == 0:
             features_1 = features['data_saved']
@@ -95,7 +95,7 @@ def main(model_path, data_path, env_config):
         scenario_env_config = copy.deepcopy(env_config)
         scenario_env_config['features'] = [scenario_1, scenario_2]
 
-        while True:
+        for i in range(10):
             scenario_env_config['random_seed'] = random_seed
             env = load_env(scenario_env_config)
             random_seed += 1
@@ -125,24 +125,35 @@ def main(model_path, data_path, env_config):
                     break
 
             if choice is not None:
+                ground_truths.append(saved)
                 choices.append(choice)
                 break
 
         if len(choices) >= MAX_EVAL_SAMPLES:
             ground_truths = np.asarray(ground_truths)
             choices = np.asarray(choices)
-
-            f1 = f1_score(
-                ground_truths,
-                choices,
-                average='micro',
-                zero_division=0)
             accuracy = accuracy_score(ground_truths, choices)
 
-            print(f1)
             print(accuracy)
-            return
+            return accuracy
+
+
+def evaluate_incrementally(model_path, data_path, env_config, num_ignore=10):
+    model_path = Path(model_path)
+    model_paths = model_path.parent.glob(f'**/{model_path.name}_*')
+    model_paths = [
+        (int(path.name.split('_')[-1]), path)
+        for path in model_paths]
+    model_paths.sort(key=lambda x: x[0])
+
+    accuracies = []
+    for episode, path in tqdm(model_paths[num_ignore:]):
+        accuracy = main(path, data_path, env_config)
+        accuracies.append((episode, accuracy))
+
+    np.save(model_path / 'accuracy.npy', np.asarray(accuracies))
 
 
 if __name__ == '__main__':
     main(MODEL_PATH, DATA_PATH, ENV_CONFIG)
+    # evaluate_incrementally(MODEL_PATH, DATA_PATH, ENV_CONFIG, num_ignore=10)

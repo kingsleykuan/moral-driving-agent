@@ -2,6 +2,7 @@ import collections
 import copy
 import math
 import random
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -63,6 +64,7 @@ class DQNTrainer:
             weight_decay=1e-5,
             log_dir=None,
             save_path=None,
+            save_incrementally=False,
             device=None,
             double_dqn=True,
             gamma=0.999,
@@ -87,8 +89,9 @@ class DQNTrainer:
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
 
-        self.log_dir = log_dir
-        self.save_path = save_path
+        self.log_dir = Path(log_dir)
+        self.save_path = Path(save_path)
+        self.save_incrementally = save_incrementally
 
         if device is None:
             self.device = torch.device(
@@ -130,6 +133,11 @@ class DQNTrainer:
 
         self.num_actions = self.env.action_space.n
 
+        self.episode_rewards = []
+        self.episode_driving_rewards = []
+        self.episode_moral_rewards = []
+        self.episode_finished = []
+
     def train(self):
         episode_rewards = []
 
@@ -142,6 +150,13 @@ class DQNTrainer:
             self.model = self.model.train()
             episode_reward = self.train_episode()
             episode_rewards.append(episode_reward)
+
+            self.episode_rewards.append(self.env.episode_reward)
+            self.episode_driving_rewards.append(
+                self.env.episode_driving_reward)
+            self.episode_moral_rewards.append(
+                self.env.episode_moral_reward)
+            self.episode_finished.append(self.env.finished)
 
             if self.episode % self.episodes_per_log == 0:
                 average_episode_reward = np.mean(
@@ -160,7 +175,9 @@ class DQNTrainer:
                         self.epsilon(),
                         global_step=self.global_step)
 
-            if self.save_path and self.episode % self.episodes_per_save == 0:
+            if self.save_path and (
+                    self.episode % self.episodes_per_save == 0
+                    or self.episode == self.num_episodes):
                 self.save_model()
 
     def train_episode(self):
@@ -284,4 +301,18 @@ class DQNTrainer:
             * math.exp(-1.0 * (self.episode - 1) / self.epsilon_decay)
 
     def save_model(self):
-        self.model.save(self.save_path)
+        if self.save_incrementally:
+            save_path = self.save_path.parent \
+                / f'{self.save_path.name}_{self.episode}'
+        else:
+            save_path = self.save_path
+
+        self.model.save(save_path)
+
+        logs = {
+            'rewards': np.asarray(self.episode_rewards),
+            'driving_rewards': np.asarray(self.episode_driving_rewards),
+            'moral_rewards': np.asarray(self.episode_moral_rewards),
+            'finished': np.asarray(self.episode_finished),
+        }
+        np.savez_compressed(self.save_path / 'logs.npz', **logs)
