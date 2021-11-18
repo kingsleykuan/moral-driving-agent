@@ -44,7 +44,6 @@ class DenseReward:
     CRASH_REWARD = -10
     TIMESTEP_REWARD = -1
     INVALID_CHOICE_REWARD = -10  # Crashes into invalid sides when forced to do trolley
-    BARRIER_CRASH_REWARD = -1    # Crashes into barrier after observing
 
 
 class SparseReward:
@@ -53,7 +52,6 @@ class SparseReward:
     CRASH_REWARD = 0
     TIMESTEP_REWARD = 0
     INVALID_CHOICE_REWARD = 0
-    BARRIER_CRASH_REWARD = 0
 
 
 class DefaultConfig:
@@ -794,7 +792,7 @@ class MoralGridDrivingEnv(gym.Env):
 
         self.rewards = kwargs.get('rewards', SparseReward)
         rewards = [self.rewards.TIMESTEP_REWARD, self.rewards.CRASH_REWARD, self.rewards.MISSED_REWARD,
-                   self.rewards.FINISH_REWARD, self.rewards.INVALID_CHOICE_REWARD, self.rewards.BARRIER_CRASH_REWARD]
+                   self.rewards.FINISH_REWARD, self.rewards.INVALID_CHOICE_REWARD]
         self.reward_range = (min(rewards), max(rewards))
 
         self.boundary = Rectangle(self.width, len(self.lanes))
@@ -859,9 +857,7 @@ class MoralGridDrivingEnv(gym.Env):
             self.finished = True
         except InvalidChoiceException:
             reward = self.rewards.INVALID_CHOICE_REWARD
-        except AgentBarrierCrashException:
-            reward = self.rewards.BARRIER_CRASH_REWARD
-        except AgentInObservation:
+        except (AgentInObservation, AgentBarrierCrashException):
             if self.moral_reward_model is not None:
                 for moral_obs in self.world.state.observations:
                     agent_x = self.world.state.agent.position.x
