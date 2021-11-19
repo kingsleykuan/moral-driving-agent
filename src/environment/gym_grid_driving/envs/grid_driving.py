@@ -44,7 +44,6 @@ class DenseReward:
     CRASH_REWARD = -10
     TIMESTEP_REWARD = -1
     INVALID_CHOICE_REWARD = -10  # Crashes into invalid sides when forced to do trolley
-    BARRIER_CRASH_REWARD = -1    # Crashes into barrier after observing
 
 
 class SparseReward:
@@ -53,7 +52,6 @@ class SparseReward:
     CRASH_REWARD = 0
     TIMESTEP_REWARD = 0
     INVALID_CHOICE_REWARD = 0
-    BARRIER_CRASH_REWARD = 0
 
 
 class DefaultConfig:
@@ -406,7 +404,9 @@ class World(object):
 
         self.features = []
 
-        for feat in features:
+        no_barrier = random.randint(0, len(features))
+
+        for feat_num, feat in enumerate(features):
             if feat.random:
                 people = [random.random_integers(feat.PedPed[0], feat.PedPed[1]),
                         random.random_integers(feat.Barrier[0], feat.Barrier[1]),
@@ -433,12 +433,18 @@ class World(object):
                         random.random_integers(feat.Cat[0], feat.Cat[1])]
 
                 total = 0
-                idxs = []
+
+                if feat_num == no_barrier:
+                    idxs = set((0, 2))
+                else:
+                    idxs = set((0, 1, 2))
+
                 max_people = random.random_integers(0, feat.max)
                 while total < max_people:
-                    idx = random.randint(0, len(people))
-                    total += people[idx]
-                    idxs.append(idx)
+                    idx = random.randint(3, len(people))
+                    if idx not in idxs:
+                        total += people[idx]
+                        idxs.add(idx)
 
                 for i in range(0, len(people)):
                     if not i in idxs:
@@ -794,7 +800,7 @@ class MoralGridDrivingEnv(gym.Env):
 
         self.rewards = kwargs.get('rewards', SparseReward)
         rewards = [self.rewards.TIMESTEP_REWARD, self.rewards.CRASH_REWARD, self.rewards.MISSED_REWARD,
-                   self.rewards.FINISH_REWARD, self.rewards.INVALID_CHOICE_REWARD, self.rewards.BARRIER_CRASH_REWARD]
+                   self.rewards.FINISH_REWARD, self.rewards.INVALID_CHOICE_REWARD]
         self.reward_range = (min(rewards), max(rewards))
 
         self.boundary = Rectangle(self.width, len(self.lanes))
@@ -840,11 +846,12 @@ class MoralGridDrivingEnv(gym.Env):
         assert isinstance(action, Action)
 
         reward = 0
+        moral_state = False
 
         if self.done:
             logger.warn("You are calling 'step()' even though this environment has already returned done = True. \
                 You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
-            return self.state, reward, self.done, {}
+            return self.state, reward, self.done, {'moral_state': moral_state}
 
         try:
             self.world.step(action)
@@ -859,9 +866,7 @@ class MoralGridDrivingEnv(gym.Env):
             self.finished = True
         except InvalidChoiceException:
             reward = self.rewards.INVALID_CHOICE_REWARD
-        except AgentBarrierCrashException:
-            reward = self.rewards.BARRIER_CRASH_REWARD
-        except AgentInObservation:
+        except (AgentInObservation, AgentBarrierCrashException):
             if self.moral_reward_model is not None:
                 for moral_obs in self.world.state.observations:
                     agent_x = self.world.state.agent.position.x
@@ -879,21 +884,23 @@ class MoralGridDrivingEnv(gym.Env):
                         # Get moral reward from model
                         reward = self.moral_reward_model(moral_obs_feat)
                         reward = reward['rewards'].item() * MORAL_REWARD_SCALE
+
                         self.episode_moral_reward += reward
                         self.episode_driving_reward -= reward
                         reward += self.rewards.TIMESTEP_REWARD
 
+                        moral_state = True
                         self.hit_observations.add(moral_obs.id)
                         break
             else:
-                reward = 0
-        
+                reward = self.rewards.TIMESTEP_REWARD
+
         self.episode_reward += reward
         self.episode_driving_reward += reward
 
         self.update_state()
 
-        return self.state, reward, self.done, {}
+        return self.state, reward, self.done, {'moral_state': moral_state}
 
     def step(self, action, state=None):
         if state is not None:

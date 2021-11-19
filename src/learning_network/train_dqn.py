@@ -103,20 +103,48 @@ def load_model(input_channels, num_actions):
     return DQNModel(input_channels, num_actions, dropout_rate=0.1)
 
 
-def main(env_config):
+def load_pretrained_model(model_path):
+    return DQNModel.load(model_path)
+
+
+def train_base(env_config):
+    env_config['moral_reward_model_path'] = None
     env = load_env(env_config)
+
     model = load_model(env.observation_space.shape[0], env.action_space.n)
 
     trainer = DQNTrainer(
         env,
         model,
-        log_dir='runs/double_dqn',
-        save_path='models/double_dqn',
+        num_episodes=10000,
+        log_dir='runs/double_dqn_base',
+        save_path='models/double_dqn_base',
         save_incrementally=False,
-        double_dqn=True)
+        double_dqn=True,
+        double_replay=False)
+
+    trainer.train()
+
+
+def train_moral(env_config):
+    env_config['moral_reward_model_path'] = 'models/moral_reward'
+    env = load_env(env_config)
+
+    model = load_pretrained_model('models/double_dqn_base')
+
+    trainer = DQNTrainer(
+        env,
+        model,
+        num_episodes=20000,
+        log_dir='runs/double_dqn_moral',
+        save_path='models/double_dqn_moral',
+        save_incrementally=True,
+        double_dqn=True,
+        double_replay=True)
 
     trainer.train()
 
 
 if __name__ == '__main__':
-    main(ENV_CONFIG)
+    train_base(ENV_CONFIG)
+    train_moral(ENV_CONFIG)
