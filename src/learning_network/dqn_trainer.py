@@ -74,7 +74,7 @@ class DQNTrainer:
             epsilon_decay=1000,
             replay_memory_max=5000,
             replay_memory_min=1000,
-            target_model_update=20):
+            target_model_update=10):
         self.env = env
         self.model = model
 
@@ -320,7 +320,7 @@ class DQNTrainer:
 
     def save_model(self):
         if self.save_incrementally:
-            save_path = self.save_path.parent \
+            save_path = self.save_path \
                 / f'{self.save_path.name}_{self.episode}'
         else:
             save_path = self.save_path
@@ -333,4 +333,4 @@ class DQNTrainer:
             'moral_rewards': np.asarray(self.episode_moral_rewards),
             'finished': np.asarray(self.episode_finished),
         }
-        np.savez_compressed(self.save_path / 'logs.npz', **logs)
+        np.savez_compressed(save_path / 'logs.npz', **logs)

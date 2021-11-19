@@ -136,7 +136,7 @@ def train_moral(env_config):
         model,
         log_dir='runs/double_dqn_moral',
         save_path='models/double_dqn_moral',
-        save_incrementally=False,
+        save_incrementally=True,
         double_dqn=True,
         double_replay=True)
 

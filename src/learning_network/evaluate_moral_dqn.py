@@ -142,7 +142,7 @@ def main(model_path, data_path, env_config):
 
 def evaluate_incrementally(model_path, data_path, env_config, ignore_first=10):
     model_path = Path(model_path)
-    model_paths = model_path.parent.glob(f'**/{model_path.name}_*')
+    model_paths = model_path.glob(f'**/{model_path.name}_*')
     model_paths = [
         (int(path.name.split('_')[-1]), path)
         for path in model_paths]
@@ -153,10 +153,10 @@ def evaluate_incrementally(model_path, data_path, env_config, ignore_first=10):
         accuracy = main(path, data_path, env_config)
         accuracies.append((episode, accuracy))
 
-    np.save(model_path / 'accuracy.npy', np.asarray(accuracies))
+    np.save(model_paths[-1][1] / 'accuracy.npy', np.asarray(accuracies))
 
 
 if __name__ == '__main__':
-    main(MODEL_PATH, DATA_PATH, ENV_CONFIG)
-    # evaluate_incrementally(
-    #     MODEL_PATH, DATA_PATH, ENV_CONFIG, ignore_first=10)
+    # main(MODEL_PATH, DATA_PATH, ENV_CONFIG)
+    evaluate_incrementally(
+        MODEL_PATH, DATA_PATH, ENV_CONFIG, ignore_first=0)
