@@ -846,11 +846,12 @@ class MoralGridDrivingEnv(gym.Env):
         assert isinstance(action, Action)
 
         reward = 0
+        moral_state = False
 
         if self.done:
             logger.warn("You are calling 'step()' even though this environment has already returned done = True. \
                 You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
-            return self.state, reward, self.done, {}
+            return self.state, reward, self.done, {'moral_state': moral_state}
 
         try:
             self.world.step(action)
@@ -883,21 +884,23 @@ class MoralGridDrivingEnv(gym.Env):
                         # Get moral reward from model
                         reward = self.moral_reward_model(moral_obs_feat)
                         reward = reward['rewards'].item() * MORAL_REWARD_SCALE
+
                         self.episode_moral_reward += reward
                         self.episode_driving_reward -= reward
                         reward += self.rewards.TIMESTEP_REWARD
 
+                        moral_state = True
                         self.hit_observations.add(moral_obs.id)
                         break
             else:
-                reward = 0
-        
+                reward = self.rewards.TIMESTEP_REWARD
+
         self.episode_reward += reward
         self.episode_driving_reward += reward
 
         self.update_state()
 
-        return self.state, reward, self.done, {}
+        return self.state, reward, self.done, {'moral_state': moral_state}
 
     def step(self, action, state=None):
         if state is not None:

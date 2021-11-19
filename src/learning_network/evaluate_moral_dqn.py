@@ -23,7 +23,7 @@ register(
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 MAX_EVAL_SAMPLES = 1000
-MODEL_PATH = 'models/double_dqn'
+MODEL_PATH = 'models/double_dqn_moral'
 DATA_PATH = 'data/moral_data_test.npz'
 
 ENV_CONFIG = {
@@ -130,15 +130,17 @@ def main(model_path, data_path, env_config):
                 break
 
         if len(choices) >= MAX_EVAL_SAMPLES:
-            ground_truths = np.asarray(ground_truths)
-            choices = np.asarray(choices)
-            accuracy = accuracy_score(ground_truths, choices)
+            break
 
-            print(accuracy)
-            return accuracy
+    ground_truths = np.asarray(ground_truths)
+    choices = np.asarray(choices)
+    accuracy = accuracy_score(ground_truths, choices)
+
+    print(f"Accuracy: {accuracy}")
+    return accuracy
 
 
-def evaluate_incrementally(model_path, data_path, env_config, num_ignore=10):
+def evaluate_incrementally(model_path, data_path, env_config, ignore_first=10):
     model_path = Path(model_path)
     model_paths = model_path.parent.glob(f'**/{model_path.name}_*')
     model_paths = [
@@ -147,7 +149,7 @@ def evaluate_incrementally(model_path, data_path, env_config, num_ignore=10):
     model_paths.sort(key=lambda x: x[0])
 
     accuracies = []
-    for episode, path in tqdm(model_paths[num_ignore:]):
+    for episode, path in tqdm(model_paths[ignore_first:]):
         accuracy = main(path, data_path, env_config)
         accuracies.append((episode, accuracy))
 
@@ -156,4 +158,5 @@ def evaluate_incrementally(model_path, data_path, env_config, num_ignore=10):
 
 if __name__ == '__main__':
     main(MODEL_PATH, DATA_PATH, ENV_CONFIG)
-    # evaluate_incrementally(MODEL_PATH, DATA_PATH, ENV_CONFIG, num_ignore=10)
+    # evaluate_incrementally(
+    #     MODEL_PATH, DATA_PATH, ENV_CONFIG, ignore_first=10)

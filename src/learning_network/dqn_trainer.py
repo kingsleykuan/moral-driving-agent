@@ -54,7 +54,7 @@ class DQNTrainer:
             model,
             num_episodes=10000,
             episode_max_len=1000,
-            episodes_per_log=10,
+            episodes_per_log=100,
             episodes_per_save=100,
             steps_per_log=1000,
             metrics_average_len=100,
@@ -67,6 +67,7 @@ class DQNTrainer:
             save_incrementally=False,
             device=None,
             double_dqn=True,
+            double_replay=True,
             gamma=0.999,
             epsilon_start=0.9,
             epsilon_end=0.1,
@@ -117,6 +118,7 @@ class DQNTrainer:
         self.global_step = 1
 
         self.double_dqn = double_dqn
+        self.double_replay = double_replay
         self.gamma = gamma
         self.epsilon_start = epsilon_start
         self.epsilon_end = epsilon_end
@@ -129,7 +131,9 @@ class DQNTrainer:
         self.target_model = self.target_model.to(self.device)
         self.target_model = self.target_model.eval()
 
-        self.replay_memory = ReplayMemory(self.replay_memory_max)
+        self.driving_replay_memory = ReplayMemory(self.replay_memory_max)
+        if self.double_replay:
+            self.moral_replay_memory = ReplayMemory(self.replay_memory_max)
 
         self.num_actions = self.env.action_space.n
 
@@ -202,7 +206,7 @@ class DQNTrainer:
             done = torch.tensor((done,), dtype=torch.float, device=self.device)
 
             batch = self.preprocess_data(
-                state, action, reward, next_state, done)
+                state, action, next_state, reward, done, info)
             state = next_state
 
             if batch is None:
@@ -237,21 +241,35 @@ class DQNTrainer:
 
         return episode_reward
 
-    def preprocess_data(self, state, action, reward, next_state, done):
-        transitions = {
+    def preprocess_data(self, state, action, next_state, reward, done, info):
+        transition = {
                 'state': state,
                 'action': action,
                 'reward': reward,
                 'next_state': next_state,
                 'done': done,
             }
-        self.replay_memory.push(transitions)
+        self.driving_replay_memory.push(transition)
+
+        if self.double_replay and info['moral_state']:
+            self.moral_replay_memory.push(transition)
 
         # Check if replay memory has enough samples
-        if len(self.replay_memory) < self.replay_memory_min:
+        if len(self.driving_replay_memory) < self.replay_memory_min:
             return None
         else:
-            return self.replay_memory.sample(self.batch_size)
+            if (not self.double_replay
+                    or len(self.moral_replay_memory) < self.replay_memory_min):
+                return self.driving_replay_memory.sample(self.batch_size)
+            else:
+                batch = [
+                    self.driving_replay_memory.sample(self.batch_size),
+                    self.moral_replay_memory.sample(self.batch_size),
+                ]
+                batch = {
+                    key: torch.cat((batch[0][key], batch[1][key]), 0)
+                    for key in batch[0].keys()}
+                return batch
 
     def loss(self, states, actions, rewards, next_states, dones):
         # Sync target model if needed
