@@ -404,7 +404,9 @@ class World(object):
 
         self.features = []
 
-        for feat in features:
+        no_barrier = random.randint(0, len(features))
+
+        for feat_num, feat in enumerate(features):
             if feat.random:
                 people = [random.random_integers(feat.PedPed[0], feat.PedPed[1]),
                         random.random_integers(feat.Barrier[0], feat.Barrier[1]),
@@ -431,12 +433,18 @@ class World(object):
                         random.random_integers(feat.Cat[0], feat.Cat[1])]
 
                 total = 0
-                idxs = []
+
+                if feat_num == no_barrier:
+                    idxs = set((0, 2))
+                else:
+                    idxs = set((0, 1, 2))
+
                 max_people = random.random_integers(0, feat.max)
                 while total < max_people:
-                    idx = random.randint(0, len(people))
-                    total += people[idx]
-                    idxs.append(idx)
+                    idx = random.randint(3, len(people))
+                    if idx not in idxs:
+                        total += people[idx]
+                        idxs.add(idx)
 
                 for i in range(0, len(people)):
                     if not i in idxs:
