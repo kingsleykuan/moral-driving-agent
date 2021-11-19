@@ -58,7 +58,7 @@ class DQNTrainer:
             episodes_per_save=100,
             steps_per_log=1000,
             metrics_average_len=100,
-            batch_size=32,
+            batch_size=64,
             gradient_accumulation_steps=1,
             learning_rate=1e-3,
             weight_decay=1e-5,

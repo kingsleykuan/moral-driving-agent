@@ -116,6 +116,7 @@ def train_base(env_config):
     trainer = DQNTrainer(
         env,
         model,
+        num_episodes=10000,
         log_dir='runs/double_dqn_base',
         save_path='models/double_dqn_base',
         save_incrementally=False,
@@ -134,6 +135,7 @@ def train_moral(env_config):
     trainer = DQNTrainer(
         env,
         model,
+        num_episodes=20000,
         log_dir='runs/double_dqn_moral',
         save_path='models/double_dqn_moral',
         save_incrementally=True,
