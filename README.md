@@ -46,3 +46,13 @@ python -m learning_network.evaluate_moral_dqn
 
 ## Plotting Results
 Results can be plotted with `plot_results.ipynb`
+
+![Average Reward per Episode](src/plots/episode_rewards_all.png)
+
+![Average Driving Reward per Episode](src/plots/episode_driving_rewards_all.png)
+
+![Average Moral Reward per Episode](src/plots/episode_moral_rewards_all.png)
+
+![Average Rate of Finishing Episodes](src/plots/episode_finish_rate_all.png)
+
+![Average Accuracy of Moral Choices On Test Set per Episode](src/plots/moral_accuracy_all.png)
