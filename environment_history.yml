@@ -1,0 +1,25 @@
+name: moral-agent
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.9
+  - flake8
+  - flake8-docstrings
+  - pytest
+  - jupyter
+  - tqdm
+  - numpy
+  - scipy
+  - matplotlib
+  - pandas
+  - seaborn
+  - scikit-learn
+  - numba
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cudatoolkit=11.1
+  - tensorboard
+  - gym
