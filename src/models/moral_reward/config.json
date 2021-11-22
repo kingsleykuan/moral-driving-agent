@@ -1,0 +1,7 @@
+{
+    "input_size": 23,
+    "hidden_size": 128,
+    "dropout_rate": 0.1,
+    "epoch": 5,
+    "f1_score": 0.721338299778508
+}

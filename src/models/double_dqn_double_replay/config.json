@@ -1,0 +1,5 @@
+{
+    "input_channels": 27,
+    "num_actions": 4,
+    "dropout_rate": 0.1
+}
