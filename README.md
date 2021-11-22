@@ -1,4 +1,17 @@
-# Moral Driving Agent
+# Moral Self-Driving Agents: Investigating Reinforcement Learning for Moral Decision Problems in Autonomous Vehicles
+
+An NUS CS4246/CS5446 AI Planning and Decision Making project.
+
+* **Kingsley Kuan** - [kingsleykuan](https://github.com/kingsleykuan)
+* **Joel Ho** - [JoelHo](https://github.com/JoelHo)
+* **Zechariah Tan** - [ZechariahTan](https://github.com/ZechariahTan)
+
+## Setup
+Environment can be setup using Conda:
+```
+conda env create -f environment.yml
+conda activate moral-agent
+```
 
 Note: All scripts should be executed from `src/` directory
 
@@ -43,6 +56,12 @@ Evaluate moral DQN agent
 ```
 python -m learning_network.evaluate_moral_dqn
 ```
+
+## Interactive Simulator
+
+Interactive simulator can be run with `InteractiveNotebook.ipynb`
+
+Pre-trained models are available in `src/models/`
 
 ## Plotting Results
 Results can be plotted with `plot_results.ipynb`
